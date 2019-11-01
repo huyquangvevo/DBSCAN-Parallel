@@ -9,6 +9,7 @@ struct Point
 };
 
 int n_points = 0;
+int truth[150000];
 struct Point points[150000];
 
 void readPoints(){
@@ -22,7 +23,8 @@ void readPoints(){
         p = strtok(NULL," ");
         p_.y = strtof(p,NULL);
         p = strtok(NULL," ");
-        p_.label = strtod(p,NULL);
+        truth[n_points] = strtod(p,NULL);
+        p_.label = NULL
         points[n_points] = p_;
         n_points++;
     };
@@ -30,6 +32,9 @@ void readPoints(){
     fclose(f);
 }
 
+dbscan(){
+
+}
 
 main(){
     readPoints();
