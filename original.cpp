@@ -4,6 +4,9 @@
 #include<iostream>
 #include<vector>
 #include<cmath>
+#include<fstream>
+#include <bits/stdc++.h> 
+#include<string>
 
 using namespace std;
 
@@ -15,8 +18,8 @@ class Point {
 
 int n_points = 0;
 int truth[150000];
-float eps = 4;
-int minPts = 10;
+float eps = 0.015;
+int minPts = 6;
 vector<Point> points;
 const int UNDEFINED = -100;
 
@@ -38,6 +41,19 @@ void readPoints(){
         n_points++;
     };
     fclose(f);
+};
+
+void pointsToFile(){
+    ofstream f;
+    f.open("./data/clustered.txt");
+    for(size_t p=0;p<points.size();++p){
+        string px(to_string(points[p].x));
+        string py(to_string(points[p].y));
+        string pl(to_string(points[p].label));
+        string pstr = px + " " + py + " " + pl +"\n";
+        f << pstr;
+    }
+    f.close();
 }
 
 float dist2points(Point p1,Point p2){
@@ -54,12 +70,14 @@ vector<Point> rangeQuery(Point p){
     return neighbors;
 }
 
-void dbscan(){
+int dbscan(){
     int c = 0;
     for (size_t p = 0; p< points.size();++p){
         if(points[p].label != UNDEFINED)
             continue;
         vector<Point> neighbors =  rangeQuery(points[p]);
+        // cout << neighbors.size() << endl;
+        // exit(0);
         if(neighbors.size() + 1 < minPts){
             points[p].label = -1;
             continue;
@@ -78,11 +96,14 @@ void dbscan(){
             }
         }
     }
+    return c;
 };
 
 int main(){
     readPoints();
-    // dbscan();
+    int clusters = dbscan();
+    cout << "cluster " << clusters << endl;
+    pointsToFile();
     int count = 0;
     for (size_t i=0;i<points.size();++i){
         cout << points[i].label << endl;
