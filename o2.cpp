@@ -19,7 +19,6 @@ class Point {
 };
 
 int n_points = 0;
-// int truth[150000];
 float eps = 0.3;
 int minPts = 5;
 Point points[150000];
@@ -37,11 +36,9 @@ void readPoints(){
         p = strtok(NULL," ");
         p_.y = strtof(p,NULL);
         p = strtok(NULL," ");
-        // truth[n_points] = strtod(p,NULL);
         p_.label = UNDEFINED;
         p_.id = n_points;
         points[n_points] = p_;
-        // points.push_back(p_);
         n_points++;
     };
     fclose(f);
@@ -72,9 +69,7 @@ set<int> rangeQuery(Point p){
     set<int> neighbors;
     for (int q=0;q < n_points;q++){
         if(dist2points(p,points[q]) <= eps){
-            // if(!comparePoint(points[q],p)){
                 neighbors.insert(points[q].id);
-            // }
         }
     }
     return neighbors;
@@ -92,13 +87,12 @@ int dbscan(){
             continue;
         };
         c = c + 1;
-        if(c>1){
-            pointsToFile();
-            exit(0);
-        }
         points[p].label = c;
         set<int> S = neighbors;
-        for(set<int>::iterator i=S.begin();i!=S.end();++i){
+        while (S.size()>0)
+        {
+            set<int>::iterator i = S.begin();
+            S.erase(i);
             if(points[*i].label == -1){
                 points[*i].label = c;
                 cout << "noise" << endl;
@@ -109,11 +103,6 @@ int dbscan(){
             set<int> N = rangeQuery(points[*i]);
             if(N.size()>=minPts){
                 S.insert(N.begin(),N.end());
-                // pointsToFile();
-                // exit(0);
-            } else {
-                // points[*i].label = -1;
-                cout << "noise" << endl;
             }
         }
     }
