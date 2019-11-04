@@ -21,7 +21,7 @@ class Point {
 int n_points = 0;
 // int truth[150000];
 float eps = 0.3;
-int minPts = 5;
+int minPts = 1;
 Point points[150000];
 const int UNDEFINED = -100;
 
@@ -49,7 +49,7 @@ void readPoints(){
 
 void pointsToFile(){
     ofstream f;
-    f.open("./data/clustered2.txt");
+    f.open("./data/clustered.txt");
     for(int p=0;p<n_points;p++){
         string px(to_string(points[p].x));
         string py(to_string(points[p].y));
@@ -72,9 +72,9 @@ set<int> rangeQuery(Point p){
     set<int> neighbors;
     for (int q=0;q < n_points;q++){
         if(dist2points(p,points[q]) <= eps){
-            if(!comparePoint(points[q],p)){
+            // if(!comparePoint(points[q],p)){
                 neighbors.insert(points[q].id);
-            }
+            // }
         }
     }
     return neighbors;
@@ -94,14 +94,20 @@ int dbscan(){
         points[p].label = c;
         set<int> S = neighbors;
         for(set<int>::iterator i=S.begin();i!=S.end();++i){
+            // cout << *i << endl;
             if(points[*i].label == -1)
                 points[*i].label = c;
             if(points[*i].label != UNDEFINED)
                 continue;
+            // cout << "old label: " << points[*i].label << endl;
             points[*i].label = c;
+            // cout << "new label: " << points[*i].label << endl;
+            // cout << points[*i].label << endl;
             set<int> N = rangeQuery(points[*i]);
             if(N.size()>=minPts){
+                // cout << "size before : " << S.size() << endl;
                 S.insert(N.begin(),N.end());
+                // cout << "size after : " << S.size() << endl;
             }
         }
     }
