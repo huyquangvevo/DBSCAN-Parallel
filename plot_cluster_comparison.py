@@ -90,6 +90,8 @@ datasets = [
              'min_samples': 20, 'xi': 0.1, 'min_cluster_size': .2}),
     (blobs, {}),
     (no_structure, {})]
+noisy_circles = list(noisy_circles)
+noisy_circles[0] = StandardScaler().fit_transform(noisy_circles[0])
 
 def writeData(name,data):
     fileName = './data/' + name + '.txt'
@@ -99,9 +101,16 @@ def writeData(name,data):
         for i,p in enumerate(points):
             f.write(str(p[0]) + ' ' + str(p[1]) + ' ' + str(labels[i]) + '\n')
 
+circles = noisy_circles[0].T
+# print(circles[0])
+# exit()
+# plt.plot(circles[0],circles[1],'bo')
+# plt.scatter(circles[0],circles[1],c=noisy_circles[1])
 
+# plt.show()
+# print(circles[0])
 # circles = noisy_circles
 # print(circles)
 # exit()
 writeData('Circle',noisy_circles)
-print(noisy_circles)
+# print(noisy_circles)

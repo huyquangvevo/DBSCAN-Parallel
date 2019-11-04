@@ -7,6 +7,7 @@
 #include<fstream>
 #include <bits/stdc++.h> 
 #include<string>
+#include<set>
 
 using namespace std;
 
@@ -14,16 +15,14 @@ class Point {
     public:
     float x,y;
     int label;
-    bool operator == (const Point &Ref) const{
-        return ((this->x == Ref.x) && (this->y == Ref.y) && (this->label == Ref.label));
-    }
+    int id;
 };
 
 int n_points = 0;
-int truth[150000];
-float eps = 0.08;
-int minPts = 6;
-vector<Point> points;
+// int truth[150000];
+float eps = 0.3;
+int minPts = 5;
+Point points[150000];
 const int UNDEFINED = -100;
 
 
@@ -38,9 +37,11 @@ void readPoints(){
         p = strtok(NULL," ");
         p_.y = strtof(p,NULL);
         p = strtok(NULL," ");
-        truth[n_points] = strtod(p,NULL);
+        // truth[n_points] = strtod(p,NULL);
         p_.label = UNDEFINED;
-        points.push_back(p_);
+        p_.id = n_points;
+        points[n_points] = p_;
+        // points.push_back(p_);
         n_points++;
     };
     fclose(f);
@@ -49,7 +50,7 @@ void readPoints(){
 void pointsToFile(){
     ofstream f;
     f.open("./data/clustered2.txt");
-    for(size_t p=0;p<points.size();++p){
+    for(int p=0;p<n_points;p++){
         string px(to_string(points[p].x));
         string py(to_string(points[p].y));
         string pl(to_string(points[p].label));
@@ -67,15 +68,13 @@ bool comparePoint(Point p1,Point p2){
     return ((p1.x == p2.x) && (p1.y == p2.y) && (p1.label == p2.label));
 }
 
-vector<Point> rangeQuery(Point p){
-    vector<Point> neighbors;
-    for (size_t q = 0;q < points.size();++q){
+set<int> rangeQuery(Point p){
+    set<int> neighbors;
+    for (int q=0;q < n_points;q++){
         if(dist2points(p,points[q]) <= eps){
-            // if(!comparePoint(points[q],p)){
-                // cout << "point 1: " << points[q].x << " " << points[q].y << " " << points[q].label << endl;
-                // cout << "point 2: " << p.x << " " << p.y << " " << p.label << endl;
-            neighbors.push_back(points[q]);
-            // }
+            if(!comparePoint(points[q],p)){
+                neighbors.insert(points[q].id);
+            }
         }
     }
     return neighbors;
@@ -83,32 +82,26 @@ vector<Point> rangeQuery(Point p){
 
 int dbscan(){
     int c = 0;
-    for (size_t p = 0; p< points.size();++p){
+    for (int p = 0; p < n_points;p++){
         if(points[p].label != UNDEFINED)
             continue;
-        vector<Point> neighbors =  rangeQuery(points[p]);
-        // cout << neighbors.size() << endl;
-        // exit(0);
+        set<int> neighbors = rangeQuery(points[p]);
         if(neighbors.size() < minPts){
             points[p].label = -1;
             continue;
         };
-        // cout << "neighbors : " << neighbors.size() << endl;
-        // exit(0);
         c = c + 1;
         points[p].label = c;
-        vector<Point> S = neighbors;
-        for(size_t q=0;q<points.size();++q){
-            if(points[q].label == -1)
-                points[q].label = c;
-            if(points[q].label != UNDEFINED)
+        set<int> S = neighbors;
+        for(set<int>::iterator i=S.begin();i!=S.end();++i){
+            if(points[*i].label == -1)
+                points[*i].label = c;
+            if(points[*i].label != UNDEFINED)
                 continue;
-            points[q].label = c;
-            vector<Point> N = rangeQuery(points[q]);
+            points[*i].label = c;
+            set<int> N = rangeQuery(points[*i]);
             if(N.size()>=minPts){
-                // cout << "S size" << S.size() << endl;
-                S.insert(S.end(),N.begin(),N.end());
-                // cout << "S new size" << S.size() << endl;
+                S.insert(N.begin(),N.end());
             }
         }
     }
@@ -117,13 +110,12 @@ int dbscan(){
 
 int main(){
     readPoints();
-    // int clusters = dbscan();
+    int clusters = dbscan();
     cout << "cluster " << clusters << endl;
     pointsToFile();
     int count = 0;
-    for (size_t i=0;i<points.size();++i){
+    for (int i=0;i<n_points;i++){
         cout << points[i].label << endl;
-        // cout << dist2points(points[i],points[i+1]) << endl;
         if(count>10)
             break;
         else 
