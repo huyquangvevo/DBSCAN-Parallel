@@ -72,9 +72,9 @@ set<int> rangeQuery(Point p){
     set<int> neighbors;
     for (int q=0;q < n_points;q++){
         if(dist2points(p,points[q]) <= eps){
-            if(!comparePoint(points[q],p)){
+            // if(!comparePoint(points[q],p)){
                 neighbors.insert(points[q].id);
-            }
+            // }
         }
     }
     return neighbors;
@@ -87,21 +87,33 @@ int dbscan(){
             continue;
         set<int> neighbors = rangeQuery(points[p]);
         if(neighbors.size() < minPts){
+            cout << "noise" << endl;
             points[p].label = -1;
             continue;
         };
         c = c + 1;
+        if(c>1){
+            pointsToFile();
+            exit(0);
+        }
         points[p].label = c;
         set<int> S = neighbors;
         for(set<int>::iterator i=S.begin();i!=S.end();++i){
-            if(points[*i].label == -1)
+            if(points[*i].label == -1){
                 points[*i].label = c;
+                cout << "noise" << endl;
+            }
             if(points[*i].label != UNDEFINED)
                 continue;
             points[*i].label = c;
             set<int> N = rangeQuery(points[*i]);
             if(N.size()>=minPts){
                 S.insert(N.begin(),N.end());
+                // pointsToFile();
+                // exit(0);
+            } else {
+                // points[*i].label = -1;
+                cout << "noise" << endl;
             }
         }
     }
