@@ -16,6 +16,7 @@ class Point {
     float x,y;
     int label;
     int id;
+    bool visited;
 };
 
 int n_points = 0;
@@ -39,6 +40,7 @@ void readPoints(){
         p = strtok(NULL," ");
         // truth[n_points] = strtod(p,NULL);
         p_.label = UNDEFINED;
+        p_.visited = false;
         p_.id = n_points;
         points[n_points] = p_;
         // points.push_back(p_);
@@ -70,46 +72,56 @@ bool comparePoint(Point p1,Point p2){
 
 set<int> rangeQuery(Point p){
     set<int> neighbors;
-    for (int q=0;q < n_points;q++){
-        if(dist2points(p,points[q]) <= eps){
-            if(!comparePoint(points[q],p)){
-                neighbors.insert(points[q].id);
-            }
+    for (int q_index=0; q_index < n_points; q_index++){
+        if (dist2points(p, points[q_index]) <= eps){
+            neighbors.insert(points[q_index].id);                
         }
     }
     return neighbors;
 }
 
+
+
 int dbscan(){
-    int c = 0;
-    for (int p = 0; p < n_points;p++){
-        if(points[p].label != UNDEFINED)
+    int cluster_id = 0;
+    for (int p_index=0; p_index < n_points; p_index++){
+        if(points[p_index].visited){
             continue;
-        set<int> neighbors = rangeQuery(points[p]);
-        if(neighbors.size() < minPts){
-            points[p].label = -1;
-            continue;
-        };
-        c = c + 1;
-        points[p].label = c;
-        set<int> S = neighbors;
-        for(set<int>::iterator i=S.begin();i!=S.end();++i){
-            if(points[*i].label == -1)
-                points[*i].label = c;
-            if(points[*i].label != UNDEFINED)
-                continue;
-            points[*i].label = c;
-            set<int> N = rangeQuery(points[*i]);
-            if(N.size()>=minPts){
-                S.insert(N.begin(),N.end());
-            }
         }
+        points[p_index].visited = true;
+
+        set<int> neighbors = rangeQuery(points[p_index]);
+
+        if(neighbors.size() < minPts){
+            points[p_index].label = -1;
+        }
+        else{
+            points[p_index].label = cluster_id;
+            while(neighbors.size() > 0){
+                set<int>::iterator x_index_p = neighbors.begin();
+                neighbors.erase(x_index_p);
+                if(!points[*x_index_p].visited){
+                    points[*x_index_p].visited = true;
+                    set<int> neighbors_x = rangeQuery(points[*x_index_p]);
+                    if(neighbors_x.size() >= minPts){
+                        neighbors.insert(neighbors_x.begin(), neighbors_x.end());
+                    }
+                }
+                if(points[*x_index_p].label < 0){
+                    points[*x_index_p].label = cluster_id;
+                    points[*x_index_p].visited = true;
+                }
+            }
+            cluster_id++;
+        }
+        cout << "vinhsuhi" << endl;
     }
-    return c;
-};
+    return 0;
+}
 
 int main(){
     readPoints();
+    // return 0;
     int clusters = dbscan();
     cout << "cluster " << clusters << endl;
     pointsToFile();
