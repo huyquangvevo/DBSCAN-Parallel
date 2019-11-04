@@ -22,7 +22,7 @@ class Point {
 int n_points = 0;
 // int truth[150000];
 float eps = 0.3;
-int minPts = 1;
+int minPts = 5;
 Point points[150000];
 const int UNDEFINED = -100;
 
@@ -51,7 +51,7 @@ void readPoints(){
 
 void pointsToFile(){
     ofstream f;
-    f.open("./data/clustered.txt");
+    f.open("./data/clustered2.txt");
     for(int p=0;p<n_points;p++){
         string px(to_string(points[p].x));
         string py(to_string(points[p].y));
@@ -93,7 +93,6 @@ int dbscan(){
         set<int> neighbors = rangeQuery(points[p_index]);
 
         if(neighbors.size() < minPts){
-
             points[p_index].label = -1;
         }
         else{
