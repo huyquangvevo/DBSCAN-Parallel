@@ -7,6 +7,9 @@
         "type_traits": "cpp",
         "xstring": "cpp",
         "xutility": "cpp",
-        "ostream": "cpp"
+        "ostream": "cpp",
+        "iostream": "cpp",
+        "xtree": "cpp",
+        "set": "cpp"
     }
 }

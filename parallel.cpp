@@ -68,15 +68,15 @@ void readPoints()
 
 int calSlice()
 {
-    num_slice_0x = int(round((max_Ox - min_Ox) / (3*eps)));
-    num_slice_Oy = int(round((max_Oy - min_Oy) / (3*eps)));
+    num_slice_0x = int(round((max_Ox - min_Ox) / (3 * eps)));
+    num_slice_Oy = int(round((max_Oy - min_Oy) / (3 * eps)));
     return num_slice_0x * num_slice_Oy;
 }
 
 void pointsToFile()
 {
     ofstream f;
-    f.open("./data/clustered2.txt");
+    f.open("./data/merged.txt");
     for (int p = 0; p < n_points; p++)
     {
         string px(to_string(points[p].x));
@@ -95,10 +95,13 @@ void partitionToFile(vector<Point> p, int i)
     f.open(filename);
     for (int i = 0; i < p.size(); i++)
     {
-        string px(to_string(p[i].x));
-        string py(to_string(p[i].y));
-        string pl(to_string(p[i].clusterId));
-        string pstr = px + " " + py + " " + pl + "\n";
+        string px(to_string(points[p[i].id].x));
+        string py(to_string(points[p[i].id].y));
+        string pl(to_string(points[p[i].id].clusterId));
+        // string plocal(to_string(p[i].isLocalRegion));
+        // string pstr = px + " " + py + " " + pl + " " + plocal + "\n";
+        string pstr = px + " " + py + " " + pl + " " + "\n";
+
         f << pstr;
     }
     f.close();
@@ -114,75 +117,225 @@ bool comparePoint(Point p1, Point p2)
     return ((p1.x == p2.x) && (p1.y == p2.y) && (p1.clusterId == p2.clusterId));
 }
 
-set<int> rangeQuery(Point p, int id_P)
+int getNextSlice(int idP)
+{
+    return (idP % 4 == num_slice_0x - 1) ? idP : idP + 1;
+}
+
+set<int> findNeighbors(Point p, int idP)
 {
     set<int> neighbors;
-    for (int q = 0; q < partitions[id_P].size(); q++)
+    for (int q = 0; q < partitions[idP].size(); q++)
     {
-        if (dist2points(p, partitions[id_P][q]) <= eps)
+        if (dist2points(p, partitions[idP][q]) <= eps)
         {
-            neighbors.insert(points[q].id);
+            neighbors.insert(partitions[idP][q].id);
         }
     }
     return neighbors;
 }
 
-int dbscan(int id_P)
+set<int> getAllClusterNeighbors(Point p, int idP)
 {
-    int c = 0;
-    // cout << "partition : " << id_P << " size: " << partitions[id_P].size() << endl;
-    if (partitions[id_P].size() == 0)
-        return 0;
-    for (int p = 0; p < partitions[id_P].size(); p++)
+    set<int> clusters;
+    int nextSlice = getNextSlice(idP);
+    vector<Point> cell = partitions[idP];
+    // for (int q = 0; q < points.size(); q++)
+    // {
+    //     if (dist2points(p, points[q]) <= eps)
+    //     {
+    //         clusters.insert(points[q].clusterId);
+    //     }
+    // }
+    while (idP <= nextSlice)
     {
-        if (partitions[id_P][p].clusterId != UNDEFINED)
+        for (int q = 0; q < cell.size(); q++)
+        {
+            if (dist2points(p, cell[q]) <= eps)
+            {
+                clusters.insert(points[cell[q].id].clusterId);
+            }
+        }
+        idP++;
+        cell = partitions[idP];
+    }
+    return clusters;
+}
+
+set<int> findNeighbors(Point p)
+{
+    set<int> neighbors;
+    int cluster = 0;
+    set<int> clusterNeighbors;
+    for (int q = 0; q < points.size(); q++)
+    {
+        if (dist2points(p, points[q]) <= eps)
+        {
+            neighbors.insert(points[q].id);
+            // cout << "Point cluster id: " << points[q].clusterId << endl;
+            clusterNeighbors.insert(points[q].clusterId);
+        }
+    }
+    // cout << "Cluster size: " << clusterNeighbors.size() << " : " << *clusterNeighbors.begin() << endl;
+    return neighbors;
+}
+
+int c = 0;
+int dbscan(int idP)
+{
+    // int c = 0;
+    // cout << "partition : " << idP << " size: " << points.size() << endl;
+    vector<Point> cell = partitions[idP];
+    if (cell.size() == 0)
+        return 0;
+    for (int p = 0; p < cell.size(); p++)
+    {
+        if (points[cell[p].id].clusterId != UNDEFINED)
             continue;
-        set<int> neighbors = rangeQuery(partitions[id_P][p], id_P);
+        set<int> neighbors = findNeighbors(points[cell[p].id], idP);
         if (neighbors.size() < minPts)
         {
-            partitions[id_P][p].clusterId = -1;
+            points[cell[p].id].clusterId = -1;
             continue;
         };
         c = c + 1;
-        partitions[id_P][p].clusterId = c;
+        points[cell[p].id].clusterId = c;
         set<int> S = neighbors;
         while (S.size() > 0)
         {
             set<int>::iterator i = S.begin();
             S.erase(i);
-            if (partitions[id_P][*i].clusterId == -1)
+            if (points[*i].clusterId == -1)
             {
-                partitions[id_P][*i].clusterId = c;
+                points[*i].clusterId = c;
             }
-            if (partitions[id_P][*i].clusterId != UNDEFINED)
+            if (points[*i].clusterId != UNDEFINED)
                 continue;
-            partitions[id_P][*i].clusterId = c;
+            points[*i].clusterId = c;
 
-            set<int> N = rangeQuery(partitions[id_P][*i], id_P);
+            set<int> N = findNeighbors(points[*i], idP);
             if (N.size() >= minPts)
             {
                 S.insert(N.begin(), N.end());
             }
         }
     }
-    cout << "partition : " << id_P << " size: " << partitions[id_P].size() << " cluster: " << c << endl;
+    cout << "partition : " << idP << " size: " << points.size() << " cluster: " << c << endl;
     return c;
 };
 
 void partitionPoints()
 {
     int sX, sY, slice;
+    float area_X_right, area_Y_top, area_Y_down, area_X_left;
+    float area_eps = eps / 6;
     for (int i = 0; i < n_points; i++)
     {
-        sX = int(floor((points[i].x - min_Ox) / (3*eps)));
-        sY = int(floor((points[i].y - min_Oy) / (3*eps)));
+        sX = int(floor((points[i].x - min_Ox) / (3 * eps)));
+        sY = int(floor((points[i].y - min_Oy) / (3 * eps)));
+        area_X_right = min_Ox + (sX + 1) * 3 * eps;
+        area_Y_top = min_Oy + (sY + 1) * 3 * eps;
+        area_X_left = min_Ox + sX * 3 * eps;
+        area_Y_down = min_Oy + sY * 3 * eps;
+
+        if ((points[i].x > area_X_right - area_eps && points[i].x < area_X_right) ||
+            (points[i].y > area_Y_top - area_eps && points[i].y < area_Y_top) ||
+            (points[i].x > area_X_left && points[i].x < area_X_left + area_eps) ||
+            (points[i].y > area_Y_down && points[i].y < area_Y_down + area_eps))
+            points[i].isLocalRegion = false;
         slice = num_slice_0x * sY + sX;
         partitions[slice].push_back(points[i]);
     }
 }
 
+int findMin(set<int> clusterSet)
+{
+    int min_element = 1000;
+    set<int>::iterator it;
+    for (it = clusterSet.begin(); it != clusterSet.end(); ++it)
+    {
+        // cout << "cluster id set: " << *it << endl;
+        if (*it != -1)
+            min_element = min(min_element, *it);
+    }
+    return (min_element == 1000) ? -1 : min_element;
+}
+
+set<int> getSliceNeighbors(int idP)
+{
+    set<int> slices;
+    int rightSlice = (idP + 1 > num_slice_0x - 1) ? idP : idP + 1; //getNextSlice(idP);
+    int leftSlice = (((idP - 1) % num_slice_0x == (num_slice_0x - 1)) || (idP - 1 < 0)) ? 0 : idP - 1;
+    int downSlice = (idP - num_slice_Oy < 0) ? idP : idP - num_slice_Oy;
+    int upSlice = (idP + num_slice_Oy > num_slice_Oy) ? idP : idP + num_slice_Oy;
+    slices.insert(rightSlice);
+    slices.insert(leftSlice);
+    slices.insert(downSlice);
+    slices.insert(upSlice);
+    return slices;
+}
+
+void updateClusterId(set<int> clustersId, int idP)
+{
+    int clusterId_min = findMin(clustersId);
+    // cout << "cluster id min: " << clusterId_min << endl;
+    int nextSlice = getNextSlice(idP);
+    vector<Point> cell = partitions[idP];
+    int clusterIdPoint;
+    // for (int q = 0; q < points.size(); q++)
+    // {
+    //     clusterIdPoint = points[q].clusterId;
+    //     set<int>::iterator it;
+    //     for (it = clustersId.begin(); it != clustersId.end(); ++it)
+    //     {
+    //         if (clusterIdPoint == *it)
+    //             points[q].clusterId = clusterId_min;
+    //     }
+    // }
+    while (idP <= nextSlice)
+    {
+        for (int q = 0; q < cell.size(); q++)
+        {
+            clusterIdPoint = points[cell[q].id].clusterId;
+            set<int>::iterator it;
+            for (it = clustersId.begin(); it != clustersId.end(); ++it)
+            {
+                if (clusterIdPoint == *it)
+                    points[cell[q].id].clusterId = clusterId_min;
+            }
+            // if(clustersId.find(clusterIdPoint) != clustersId.end()){
+            //     // cout << "tim thay ne" << endl;
+            //     cout << "clustered point: " << *clustersId.find(clusterIdPoint) << endl;
+            //     cout << "clustered end: " << *clustersId.end() << endl;
+            //     points[cell[q].id].clusterId = clusterId_min;
+            // } else {
+            //     // cout << "cluster find: " << *clustersId.find(clusterIdPoint) << endl;
+            // }
+        }
+        idP++;
+        cell = partitions[idP];
+    }
+}
+
 void merge()
 {
+    int countTwo = 0;
+    for (int i = 0; i < n_slices; i++)
+    {
+        vector<Point> pointsPartition = partitions[i];
+        for (int j = 0; j < pointsPartition.size(); j++)
+        {
+            if (!points[pointsPartition[j].id].isLocalRegion)
+            {
+                set<int> clustersId = getAllClusterNeighbors(points[pointsPartition[j].id], i);
+                if (clustersId.size() >= 2)
+                    countTwo++;
+                // cout << "clusters size : " << clustersId.size() << endl;
+                updateClusterId(clustersId, i);
+            }
+        }
+    }
+    cout << "count two " << countTwo << endl;
 }
 
 int main()
@@ -200,7 +353,13 @@ int main()
     for (int i = 0; i < n_slices; i++)
     {
         dbscan(i);
-        partitionToFile(partitions[i], i);
+        // partitionToFile(partitions[i], i);
     }
+    merge();
+    pointsToFile();
+    // for (int i = 0; i < n_slices; i++)
+    // {
+    //     partitionToFile(partitions[i], i);
+    // }
     return 0;
 }
