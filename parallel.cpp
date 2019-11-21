@@ -135,32 +135,6 @@ set<int> findNeighbors(Point p, int idP)
     return neighbors;
 }
 
-set<int> getAllClusterNeighbors(Point p, int idP)
-{
-    set<int> clusters;
-    int nextSlice = getNextSlice(idP);
-    vector<Point> cell = partitions[idP];
-    // for (int q = 0; q < points.size(); q++)
-    // {
-    //     if (dist2points(p, points[q]) <= eps)
-    //     {
-    //         clusters.insert(points[q].clusterId);
-    //     }
-    // }
-    while (idP <= nextSlice)
-    {
-        for (int q = 0; q < cell.size(); q++)
-        {
-            if (dist2points(p, cell[q]) <= eps)
-            {
-                clusters.insert(points[cell[q].id].clusterId);
-            }
-        }
-        idP++;
-        cell = partitions[idP];
-    }
-    return clusters;
-}
 
 set<int> findNeighbors(Point p)
 {
@@ -252,12 +226,14 @@ int findMin(set<int> clusterSet)
 {
     int min_element = 1000;
     set<int>::iterator it;
+    cout << "find min... " << endl;
     for (it = clusterSet.begin(); it != clusterSet.end(); ++it)
     {
-        // cout << "cluster id set: " << *it << endl;
+        cout << "find min item: " << *it<< endl;
         if (*it != -1)
             min_element = min(min_element, *it);
     }
+    // cout << "min: " << min_element << endl;
     return (min_element == 1000) ? -1 : min_element;
 }
 
@@ -275,67 +251,97 @@ set<int> getSliceNeighbors(int idP)
     return slices;
 }
 
+set<int> getWindowsSlice(int index)
+{
+    set<int> windows;
+    // if ((index + 1) % num_slice_0x == 0)
+        // return windows;
+    windows.insert(index);
+    windows.insert((index + 1) >= n_slices ? index : index + 1);
+    windows.insert((index + num_slice_0x) >= n_slices ? index : index + num_slice_0x);
+    windows.insert((index + num_slice_0x + 1) >= n_slices ? index : index + num_slice_0x + 1);
+    // set<int>::iterator it;
+    // cout << "index slice : " << index << endl;
+    // for (it = windows.begin(); it != windows.end(); ++it)
+    // {
+    //     cout << "window slice: " << *it << endl;
+    // }
+    return windows;
+}
+
+set<int> getAllClusterNeighbors(Point p, int idP)
+{
+    set<int> clusters;
+    clusters.insert(p.clusterId);
+    set<int> windows = getWindowsSlice(idP);
+    set<int>::iterator it;
+    vector<Point> pointsCell;
+    // cout << "windows size all : " << windows.size() << endl;
+    for (it = windows.begin(); it != windows.end(); ++it)
+    {
+        pointsCell = partitions[*it];
+        // cout << "partitions size all : " << pointsCell.size() << endl;
+
+        for (int i=0; i < pointsCell.size(); i++)
+        {
+            if (dist2points(p, pointsCell[i]) <= eps)
+            {
+                clusters.insert(points[pointsCell[i].id].clusterId);
+            }
+        }
+    }
+    // cout << "cluster size get all : " << clusters.size() << endl;
+    return clusters;
+}
+
 void updateClusterId(set<int> clustersId, int idP)
 {
     int clusterId_min = findMin(clustersId);
     // cout << "cluster id min: " << clusterId_min << endl;
-    int nextSlice = getNextSlice(idP);
     vector<Point> cell = partitions[idP];
     int clusterIdPoint;
-    // for (int q = 0; q < points.size(); q++)
-    // {
-    //     clusterIdPoint = points[q].clusterId;
-    //     set<int>::iterator it;
-    //     for (it = clustersId.begin(); it != clustersId.end(); ++it)
-    //     {
-    //         if (clusterIdPoint == *it)
-    //             points[q].clusterId = clusterId_min;
-    //     }
-    // }
-    while (idP <= nextSlice)
+    // cout << "updating..." << endl;
+    set<int> windows = getWindowsSlice(idP);
+    if(windows.size()==0)
+        return;
+    set<int>::iterator it;
+    // cout << "windows size " << windows.size() << endl;
+    // cout << "cluster size " << clustersId.size() << endl; 
+    for (it = windows.begin(); it != windows.end(); ++it)
     {
-        for (int q = 0; q < cell.size(); q++)
+        cell = partitions[*it];
+        // cout << "cell size: " << cell.size() << endl;
+        for (int q; q < cell.size(); q++)
         {
+            set<int>::iterator itc;
             clusterIdPoint = points[cell[q].id].clusterId;
-            set<int>::iterator it;
-            for (it = clustersId.begin(); it != clustersId.end(); ++it)
+            for (itc = clustersId.begin(); itc != clustersId.end(); ++itc)
             {
-                if (clusterIdPoint == *it)
+                if (clusterIdPoint == *itc)
                     points[cell[q].id].clusterId = clusterId_min;
             }
-            // if(clustersId.find(clusterIdPoint) != clustersId.end()){
-            //     // cout << "tim thay ne" << endl;
-            //     cout << "clustered point: " << *clustersId.find(clusterIdPoint) << endl;
-            //     cout << "clustered end: " << *clustersId.end() << endl;
-            //     points[cell[q].id].clusterId = clusterId_min;
-            // } else {
-            //     // cout << "cluster find: " << *clustersId.find(clusterIdPoint) << endl;
-            // }
         }
-        idP++;
-        cell = partitions[idP];
     }
+    // cout << "end one updating." << endl;
 }
+
 
 void merge()
 {
-    int countTwo = 0;
     for (int i = 0; i < n_slices; i++)
     {
+        if((i+1)%num_slice_0x == 0)
+            continue;
         vector<Point> pointsPartition = partitions[i];
         for (int j = 0; j < pointsPartition.size(); j++)
         {
             if (!points[pointsPartition[j].id].isLocalRegion)
             {
                 set<int> clustersId = getAllClusterNeighbors(points[pointsPartition[j].id], i);
-                if (clustersId.size() >= 2)
-                    countTwo++;
-                // cout << "clusters size : " << clustersId.size() << endl;
                 updateClusterId(clustersId, i);
             }
         }
     }
-    cout << "count two " << countTwo << endl;
 }
 
 int main()
@@ -349,6 +355,8 @@ int main()
     cout << "slice ox: " << num_slice_0x << endl;
     cout << "slice oy: " << num_slice_Oy << endl;
     cout << "num slices: " << n_slices << endl;
+    // getWindowsSlice(13);
+    // exit(0);
     partitionPoints();
     for (int i = 0; i < n_slices; i++)
     {
