@@ -16,4 +16,8 @@ with open("./data/merged.txt","r") as f:
 l = set(labels)
 print(len(l))
 plt.scatter(X,Y,c=labels)
+# plt.grid(True)
+plt.grid(which='both')
+
+plt.grid(which='major', alpha=0.25)
 plt.show()        

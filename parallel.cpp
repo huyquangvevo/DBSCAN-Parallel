@@ -68,8 +68,8 @@ void readPoints()
 
 int calSlice()
 {
-    num_slice_0x = int(round((max_Ox - min_Ox) / (3 * eps)));
-    num_slice_Oy = int(round((max_Oy - min_Oy) / (3 * eps)));
+    num_slice_0x = int((max_Ox - min_Ox) / (3 * eps)) + 1;
+    num_slice_Oy = int((max_Oy - min_Oy) / (3 * eps)) + 1;
     return num_slice_0x * num_slice_Oy;
 }
 
@@ -79,6 +79,8 @@ void pointsToFile()
     f.open("./data/merged.txt");
     for (int p = 0; p < n_points; p++)
     {
+        // if(points[p].clusterId != 0)
+            // continue;
         string px(to_string(points[p].x));
         string py(to_string(points[p].y));
         string pl(to_string(points[p].clusterId));
@@ -88,16 +90,19 @@ void pointsToFile()
     f.close();
 }
 
-void partitionToFile(vector<Point> p, int i)
+void partitionToFile(vector<Point> p, int idPartittion)
 {
     ofstream f;
-    string filename = "./data/partitions/" + to_string(i) + ".txt";
+    string filename = "./data/partitions/" + to_string(idPartittion) + ".txt";
     f.open(filename);
     for (int i = 0; i < p.size(); i++)
     {
         string px(to_string(points[p[i].id].x));
         string py(to_string(points[p[i].id].y));
         string pl(to_string(points[p[i].id].clusterId));
+        if(points[p[i].id].clusterId == 0){
+            cout << "parition has label 0 : " << idPartittion << endl;
+        }
         // string plocal(to_string(p[i].isLocalRegion));
         // string pstr = px + " " + py + " " + pl + " " + plocal + "\n";
         string pstr = px + " " + py + " " + pl + " " + "\n";
@@ -198,6 +203,13 @@ int dbscan(int idP)
     return c;
 };
 
+void getPointLabel0(){
+    for(int i =0;i<n_points;i++){
+        if(points[i].clusterId == 0)
+            cout << "point: x = " << points[i].x << " - y = " << points[i].y << endl; 
+    }
+}
+
 void partitionPoints()
 {
     int sX, sY, slice;
@@ -226,10 +238,13 @@ int findMin(set<int> clusterSet)
 {
     int min_element = 1000;
     set<int>::iterator it;
-    cout << "find min... " << endl;
+    // if(clusterSet.size() > 1)
+        // cout << "cluster neighbor : " << clusterSet.size()  << endl;
     for (it = clusterSet.begin(); it != clusterSet.end(); ++it)
     {
-        cout << "find min item: " << *it<< endl;
+        // cout << "find min item: " << *it<< endl;
+        // if(clusterSet.size() > 1)
+            // cout << *it << endl;
         if (*it != -1)
             min_element = min(min_element, *it);
     }
@@ -251,20 +266,28 @@ set<int> getSliceNeighbors(int idP)
     return slices;
 }
 
+set<int> getClusterNeighbor(int idP){
+    set<int> clusterIds;
+    for (int i=0;i<n_points;i++){
+        if(i==idP)
+            continue;
+        if (dist2points(points[idP],points[i])<=eps){
+            clusterIds.insert(points[i].clusterId);
+        }
+    }
+    return clusterIds;
+}
+
 set<int> getWindowsSlice(int index)
 {
     set<int> windows;
-    // if ((index + 1) % num_slice_0x == 0)
-        // return windows;
     windows.insert(index);
-    windows.insert((index + 1) >= n_slices ? index : index + 1);
-    windows.insert((index + num_slice_0x) >= n_slices ? index : index + num_slice_0x);
-    windows.insert((index + num_slice_0x + 1) >= n_slices ? index : index + num_slice_0x + 1);
-    // set<int>::iterator it;
-    // cout << "index slice : " << index << endl;
-    // for (it = windows.begin(); it != windows.end(); ++it)
-    // {
-    //     cout << "window slice: " << *it << endl;
+    windows.insert((index + 1) >= n_slices ? index : index + 1); // 5
+    windows.insert((index + num_slice_0x) >= n_slices ? index : index + num_slice_0x); // 7
+    windows.insert((index + num_slice_0x + 1) >= n_slices ? index : index + num_slice_0x + 1); // 8
+
+    // for(int i=0;i<n_slices;i++){
+        // windows.insert(i);
     // }
     return windows;
 }
@@ -325,24 +348,74 @@ void updateClusterId(set<int> clustersId, int idP)
     // cout << "end one updating." << endl;
 }
 
-
-void merge()
-{
-    for (int i = 0; i < n_slices; i++)
-    {
-        if((i+1)%num_slice_0x == 0)
-            continue;
-        vector<Point> pointsPartition = partitions[i];
-        for (int j = 0; j < pointsPartition.size(); j++)
-        {
-            if (!points[pointsPartition[j].id].isLocalRegion)
-            {
-                set<int> clustersId = getAllClusterNeighbors(points[pointsPartition[j].id], i);
-                updateClusterId(clustersId, i);
+void updateClusterIdPoints(set<int> clusterIds){
+    int clusterId_min = findMin(clusterIds);
+    if(clusterIds.size() == 0)
+        return;
+    int clusterIdPoint;
+    for(int i=0;i<n_points;i++){
+        set<int>::iterator it;
+        clusterIdPoint = points[i].clusterId;
+        for(it=clusterIds.begin();it!=clusterIds.end();++it){
+            if (clusterIdPoint == *it){
+                points[i].clusterId = clusterId_min;
             }
         }
     }
+
 }
+
+
+void merge()
+{
+    // for (int i = 0; i < n_slices; i++)
+    // {
+    //     // if((i+1)%num_slice_0x == 0)
+    //         // continue;
+    //     // cout << "partitions: " << endl
+    //     vector<Point> pointsPartition = partitions[i];
+    //     for (int j = 0; j < pointsPartition.size(); j++)
+    //     {
+    //         if (!points[pointsPartition[j].id].isLocalRegion)
+    //         {
+    //             // set<int> clustersId = getAllClusterNeighbors(points[pointsPartition[j].id], i);
+    //             set<int> clusterIds = getClusterNeighbor(j);
+    //             // cout << "cluster size: " << clustersId.size() << endl;
+    //             // updateClusterId(clusterIds, i);
+    //             updateClusterIdPoints(clusterIds);
+    //         }
+    //     }
+    // }
+    for(int i=0;i<n_points;i++){
+        if (!points[i].isLocalRegion)
+            {
+                // set<int> clustersId = getAllClusterNeighbors(points[pointsPartition[j].id], i);
+                set<int> clusterIds = getClusterNeighbor(i);
+                // cout << "cluster size: " << clustersId.size() << endl;
+                // updateClusterId(clusterIds, i);
+                updateClusterIdPoints(clusterIds);
+            }
+    }
+}
+
+// void merge2(){
+//     for (int i = 0; i < n_slices; i++)
+//     {
+//         if((i+1)%num_slice_0x == 0)
+//             continue;
+//         // cout << "partitions: " << endl
+//         set<int> windows = getWindowsSlice(i);
+//         for (int j = 0; j < pointsPartition.size(); j++)
+//         {
+//             if (!points[pointsPartition[j].id].isLocalRegion)
+//             {
+//                 set<int> clustersId = getAllClusterNeighbors(points[pointsPartition[j].id], i);
+//                 cout << "cluster size: " << clustersId.size() << endl;
+//                 updateClusterId(clustersId, i);
+//             }
+//         }
+//     }
+// }
 
 int main()
 {
@@ -358,11 +431,16 @@ int main()
     // getWindowsSlice(13);
     // exit(0);
     partitionPoints();
-    for (int i = 0; i < n_slices; i++)
+    int totalSize = 0;
+    for (int i = 0; i <= n_slices; i++)
     {
         dbscan(i);
-        // partitionToFile(partitions[i], i);
+        partitionToFile(partitions[i], i);
+        totalSize += partitions[i].size();
     }
+    // getPointLabel0();
+    cout << "total size: " << totalSize << endl;
+    cout << " n points: " << n_points << endl; 
     merge();
     pointsToFile();
     // for (int i = 0; i < n_slices; i++)
