@@ -15,7 +15,7 @@ def get_num_part(lowest, largest, cell_width):
     return int((largest - lowest) / cell_width) + 1
 
 
-def Sequential_DBSCAN(data, X, most_left, most_bottom, cell_width, most_top, most_right, draw=0, lol=0):
+def Sequential_DBSCAN(data, X, most_left, most_bottom, cell_width, most_top, most_right, draw=1, lol=0):
     dbscan = cluster.DBSCAN(.3, 5)
     y_pred = dbscan.fit_predict(data)
     # print(y_pred)
@@ -142,7 +142,7 @@ def check_disjoin(cor_lists):
 
 
 if __name__ == "__main__":
-    n_samples = 3000
+    n_samples = 1500
     eps=.3
     cell_width = 3 * eps
     minPts = 2
