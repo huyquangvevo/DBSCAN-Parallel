@@ -17,8 +17,6 @@ class Point
 public:
     float x, y;
     int clusterId;
-    bool isLocalRegion;
-    bool isCorePoint;
     int id;
 };
 
@@ -57,8 +55,6 @@ void readPoints()
         max_Oy = max(max_Oy, p_.y);
         min_Oy = min(min_Oy, p_.y);
         p_.clusterId = UNDEFINED;
-        p_.isLocalRegion = true;
-        p_.isCorePoint = false;
         p_.id = n_points;
         points.push_back(p_);
         n_points++;
@@ -121,11 +117,6 @@ float dist2points(Point p1, Point p2)
 bool comparePoint(Point p1, Point p2)
 {
     return ((p1.x == p2.x) && (p1.y == p2.y) && (p1.clusterId == p2.clusterId));
-}
-
-int getNextSlice(int idP)
-{
-    return (idP % 4 == num_slice_0x - 1) ? idP : idP + 1;
 }
 
 set<int> findNeighbors(Point p, int idP)
@@ -212,30 +203,6 @@ void getPointLabel0()
     }
 }
 
-void partitionPoints2()
-{
-    int sX, sY, slice;
-    float area_X_right, area_Y_top, area_Y_down, area_X_left;
-    float area_eps = eps / 6;
-    for (int i = 0; i < n_points; i++)
-    {
-        sX = int(floor((points[i].x - min_Ox) / (3 * eps)));
-        sY = int(floor((points[i].y - min_Oy) / (3 * eps)));
-        area_X_right = min_Ox + (sX + 1) * 3 * eps;
-        area_Y_top = min_Oy + (sY + 1) * 3 * eps;
-        area_X_left = min_Ox + sX * 3 * eps;
-        area_Y_down = min_Oy + sY * 3 * eps;
-
-        if ((points[i].x > area_X_right - area_eps && points[i].x < area_X_right) ||
-            (points[i].y > area_Y_top - area_eps && points[i].y < area_Y_top) ||
-            (points[i].x > area_X_left && points[i].x < area_X_left + area_eps) ||
-            (points[i].y > area_Y_down && points[i].y < area_Y_down + area_eps))
-            points[i].isLocalRegion = false;
-        slice = num_slice_0x * sY + sX;
-        partitions[slice].push_back(points[i]);
-    }
-}
-
 void partitionPoints()
 {
     int sX, sY, slice;
@@ -311,12 +278,6 @@ void partitionPoints()
             if (slice - num_slice_0x >= 0)
                 partitions[slice - num_slice_0x].push_back(points[i]);
         };
-
-        // if ((points[i].x > area_X_right - area_eps && points[i].x < area_X_right) ||
-        //     (points[i].y > area_Y_top - area_eps && points[i].y < area_Y_top) ||
-        //     (points[i].x > area_X_left && points[i].x < area_X_left + area_eps) ||
-        //     (points[i].y > area_Y_down && points[i].y < area_Y_down + area_eps))
-        //     points[i].isLocalRegion = false;
 
         partitions[slice].push_back(points[i]);
     }
@@ -481,17 +442,7 @@ void merge()
     //         }
     //     }
     // }
-    for (int i = 0; i < n_points; i++)
-    {
-        if (!points[i].isLocalRegion)
-        {
-            // set<int> clustersId = getAllClusterNeighbors(points[pointsPartition[j].id], i);
-            set<int> clusterIds = getClusterNeighbor(i);
-            // cout << "cluster size: " << clustersId.size() << endl;
-            // updateClusterId(clusterIds, i);
-            updateClusterIdPoints(clusterIds);
-        }
-    }
+    
 }
 
 // void merge2(){
