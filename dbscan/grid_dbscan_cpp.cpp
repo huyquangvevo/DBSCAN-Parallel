@@ -301,7 +301,6 @@ int main()
     cout << "total size: " << totalSize << endl;
     cout << " n points: " << n_points << endl;
     cout << "partition 0 : " << partitions[0].size() << endl;
-    cout << "root size" << root.size() << endl ;
     
     pointsToFile();
     return 0;
