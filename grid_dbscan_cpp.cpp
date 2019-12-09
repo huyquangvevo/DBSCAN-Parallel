@@ -18,6 +18,7 @@ public:
     float x, y;
     int clusterId;
     int id;
+    vector<int> clusters;
 };
 
 int n_points = 0;
@@ -36,6 +37,21 @@ int num_slice_Oy = 0;
 int n_slices = 0;
 const int MAX_SLICE = 1000;
 vector<Point> partitions[MAX_SLICE];
+vector<int> root;
+
+// Disjoint set
+// find root of node and update
+int findAndUpdateRootNode(int node){
+    if( root[node] == node )  return node;
+    return root[node] = findAndUpdateRootNode(root[node]);
+}
+
+// find root of node and not update
+int bruteFind(int node){
+    if( root[node] == node )    return node;
+    return bruteFind(root[node]);
+}
+
 
 void readPoints()
 {
@@ -96,10 +112,6 @@ void partitionToFile(vector<Point> p, int idPartittion)
         string px(to_string(points[p[i].id].x));
         string py(to_string(points[p[i].id].y));
         string pl(to_string(points[p[i].id].clusterId));
-        if (points[p[i].id].clusterId == 0)
-        {
-            cout << "parition has label 0 : " << idPartittion << endl;
-        }
         // string plocal(to_string(p[i].isLocalRegion));
         // string pstr = px + " " + py + " " + pl + " " + plocal + "\n";
         string pstr = px + " " + py + " " + pl + " " + "\n";
@@ -114,10 +126,6 @@ float dist2points(Point p1, Point p2)
     return sqrt(pow((p2.x - p1.x), 2) + pow((p2.y - p1.y), 2));
 }
 
-bool comparePoint(Point p1, Point p2)
-{
-    return ((p1.x == p2.x) && (p1.y == p2.y) && (p1.clusterId == p2.clusterId));
-}
 
 set<int> findNeighbors(Point p, int idP)
 {
@@ -126,7 +134,7 @@ set<int> findNeighbors(Point p, int idP)
     {
         if (dist2points(p, partitions[idP][q]) <= eps)
         {
-            neighbors.insert(partitions[idP][q].id);
+            neighbors.insert(q);
         }
     }
     return neighbors;
@@ -150,56 +158,86 @@ set<int> findNeighbors(Point p)
     return neighbors;
 }
 
+void updateclustersPoint(int idPartition){
+    for(int i=0;i<partitions[idPartition].size();i++){
+        points[partitions[idPartition][i].id].clusters.push_back(partitions[idPartition][i].clusterId);
+    }
+}
+
+void updateClusterIdPoints(){
+    int ru,rv;
+    for(int i=0;i<n_points;i++){
+        sort(points[i].clusters.begin(),points[i].clusters.end());
+        ru = findAndUpdateRootNode(points[i].clusters[0]);
+        for(int j=1;j<points[i].clusters.size();j++){
+            rv = findAndUpdateRootNode(points[i].clusters[j]);
+            if(ru != rv){
+                root[rv] = ru;
+            }
+        }
+    }
+    for(int i=0;i<n_points;i++){
+        points[i].clusterId = root[points[i].clusters[0]];
+    }
+}
+
 int c = 0;
+
 int dbscan(int idP)
 {
     // int c = 0;
     // cout << "partition : " << idP << " size: " << points.size() << endl;
-    vector<Point> cell = partitions[idP];
-    if (cell.size() == 0)
+    // vector<Point> cell = partitions[idP];
+    if (partitions[idP].size() == 0)
         return 0;
-    for (int p = 0; p < cell.size(); p++)
+    for (int p = 0; p < partitions[idP].size(); p++)
     {
-        if (points[cell[p].id].clusterId != UNDEFINED)
+        if (partitions[idP][p].clusterId != UNDEFINED)
             continue;
-        set<int> neighbors = findNeighbors(points[cell[p].id], idP);
+        set<int> neighbors = findNeighbors(partitions[idP][p], idP);
         if (neighbors.size() < minPts)
         {
-            points[cell[p].id].clusterId = -1;
+            partitions[idP][p].clusterId = -1;
             continue;
         };
         c = c + 1;
-        points[cell[p].id].clusterId = c;
+        root.push_back(c);
+        partitions[idP][p].clusterId = c;
         set<int> S = neighbors;
         while (S.size() > 0)
         {
             set<int>::iterator i = S.begin();
             S.erase(i);
-            if (points[*i].clusterId == -1)
+            if (partitions[idP][*i].clusterId == -1)
             {
-                points[*i].clusterId = c;
+                partitions[idP][*i].clusterId = c;
             }
-            if (points[*i].clusterId != UNDEFINED)
+            if (partitions[idP][*i].clusterId != UNDEFINED)
                 continue;
-            points[*i].clusterId = c;
+            partitions[idP][*i].clusterId = c;
 
-            set<int> N = findNeighbors(points[*i], idP);
+            set<int> N = findNeighbors(partitions[idP][*i], idP);
             if (N.size() >= minPts)
             {
                 S.insert(N.begin(), N.end());
             }
         }
     }
-    cout << "partition : " << idP << " size: " << points.size() << " cluster: " << c << endl;
+    updateclustersPoint(idP);
+    // cout << "partition : " << idP << " size: " << points.size() << " cluster: " << c << endl;
     return c;
 };
 
-void getPointLabel0()
+void printClustersPoint()
 {
     for (int i = 0; i < n_points; i++)
     {
-        if (points[i].clusterId == -1)
-            cout << "point: x = " << points[i].x << " - y = " << points[i].y << endl;
+        if (points[i].clusters.size() > 1){
+            cout << "point: x = " << points[i].x << " - y = " << points[i].y << " size clusters of point: " << points[i].clusters.size() << endl;
+            for(int j=0;j<points[i].clusters.size();j++){
+                cout << "cluster id " << points[i].clusters[j] << endl;
+            }
+        }
     }
 }
 
@@ -218,68 +256,62 @@ void partitionPoints()
         area_Y_down = min_Oy + sY  * 3 * eps;
 
         slice = num_slice_0x * sY + sX;
-        if (slice == 1)
-        {   
-            cout << "sx : " << sX << " - sy: " << sY << endl;
-            cout << "area x right : " << area_X_right << endl;
-            cout << "area x left : " << area_X_left << endl;
-            cout << "area y down : " << area_Y_down << endl;
-            cout << "area y top : " << area_Y_top << endl;
-        }
 
-        if (points[i].x > area_X_right - eps && points[i].x <= area_X_right)
+        Point pointRepl = points[i];
+
+        if (pointRepl.x > area_X_right - eps && pointRepl.x <= area_X_right)
         {
-            partitions[slice + 1].push_back(points[i]);
-            if (points[i].y > area_Y_top - eps && points[i].y <= area_Y_top)
+            partitions[slice + 1].push_back(pointRepl);
+            if (pointRepl.y > area_Y_top - eps && pointRepl.y <= area_Y_top)
             {
-                partitions[slice + num_slice_0x + 1].push_back(points[i]);
-                partitions[slice + num_slice_0x].push_back(points[i]);
+                partitions[slice + num_slice_0x + 1].push_back(pointRepl);
+                partitions[slice + num_slice_0x].push_back(pointRepl);
             }
-            else if (points[i].y >= area_Y_down && points[i].y < area_Y_down + eps)
+            else if (pointRepl.y >= area_Y_down && pointRepl.y < area_Y_down + eps)
             {
                 if (slice - num_slice_0x + 1 >= 0)
                 {
-                    partitions[slice - num_slice_0x + 1].push_back(points[i]);
+                    partitions[slice - num_slice_0x + 1].push_back(pointRepl);
                     if (slice - num_slice_0x >= 0)
                     {
-                        partitions[slice - num_slice_0x].push_back(points[i]);
+                        partitions[slice - num_slice_0x].push_back(pointRepl);
                     }
                 }
             }
         }
-        else if (points[i].x >= area_X_left && points[i].x < area_X_left + eps)
+        else if (pointRepl.x >= area_X_left && pointRepl.x < area_X_left + eps)
         {
             if (slice - 1 >= 0)
-                partitions[slice - 1].push_back(points[i]);
-            if (points[i].y >= area_Y_top - eps && points[i].y < area_Y_top)
+                partitions[slice - 1].push_back(pointRepl);
+            if (pointRepl.y >= area_Y_top - eps && pointRepl.y < area_Y_top)
             {
-                partitions[slice + num_slice_0x - 1].push_back(points[i]);
-                partitions[slice + num_slice_0x].push_back(points[i]);
+                partitions[slice + num_slice_0x - 1].push_back(pointRepl);
+                partitions[slice + num_slice_0x].push_back(pointRepl);
             }
-            else if (points[i].y >= area_Y_down && points[i].y < area_Y_down + eps)
+            else if (pointRepl.y >= area_Y_down && pointRepl.y < area_Y_down + eps)
             {
                 if (slice - num_slice_0x - 1 >= 0)
                 {
-                    partitions[slice - num_slice_0x - 1].push_back(points[i]);
+                    partitions[slice - num_slice_0x - 1].push_back(pointRepl);
                     if (slice - num_slice_0x >= 0)
                     {
-                        partitions[slice - num_slice_0x].push_back(points[i]);
+                        partitions[slice - num_slice_0x].push_back(pointRepl);
                     }
                 }
             }
         };
 
-        if (points[i].y > area_Y_top - eps && points[i].y <= area_Y_top)
+        if (pointRepl.y > area_Y_top - eps && pointRepl.y <= area_Y_top)
         {
-            partitions[slice + num_slice_0x].push_back(points[i]);
+            partitions[slice + num_slice_0x].push_back(pointRepl);
         }
-        else if (points[i].y >= area_Y_down && points[i].y < area_Y_down + eps)
+        else if (pointRepl.y >= area_Y_down && pointRepl.y < area_Y_down + eps)
         {
             if (slice - num_slice_0x >= 0)
-                partitions[slice - num_slice_0x].push_back(points[i]);
+                partitions[slice - num_slice_0x].push_back(pointRepl);
         };
 
-        partitions[slice].push_back(points[i]);
+        partitions[slice].push_back(pointRepl);
     }
 }
 
@@ -445,24 +477,6 @@ void merge()
     
 }
 
-// void merge2(){
-//     for (int i = 0; i < n_slices; i++)
-//     {
-//         if((i+1)%num_slice_0x == 0)
-//             continue;
-//         // cout << "partitions: " << endl
-//         set<int> windows = getWindowsSlice(i);
-//         for (int j = 0; j < pointsPartition.size(); j++)
-//         {
-//             if (!points[pointsPartition[j].id].isLocalRegion)
-//             {
-//                 set<int> clustersId = getAllClusterNeighbors(points[pointsPartition[j].id], i);
-//                 cout << "cluster size: " << clustersId.size() << endl;
-//                 updateClusterId(clustersId, i);
-//             }
-//         }
-//     }
-// }
 
 int main()
 {
@@ -475,30 +489,22 @@ int main()
     cout << "slice ox: " << num_slice_0x << endl;
     cout << "slice oy: " << num_slice_Oy << endl;
     cout << "num slices: " << n_slices << endl;
-    // getWindowsSlice(13);
-    // exit(0);
+
+    root.push_back(0);
     partitionPoints();
     int totalSize = 0;
-    // for (int i = 0; i <= n_slices; i++)
-    // {
-    //     dbscan(i);
-    //     partitionToFile(partitions[i], i);
-    //     break;
-    //     totalSize += partitions[i].size();
-    // }
-    dbscan(1);
-    partitionToFile(partitions[1], 1);
-
+    for (int i = 0; i <= n_slices; i++)
+    {
+        dbscan(i);
+        totalSize += partitions[i].size();
+    }
+    updateClusterIdPoints();
 
     cout << "total size: " << totalSize << endl;
     cout << " n points: " << n_points << endl;
     cout << "partition 0 : " << partitions[0].size() << endl;
-    // merge();
-    // pointsToFile();
-    // getPointLabel0();
-    // for (int i = 0; i < n_slices; i++)
-    // {
-    //     partitionToFile(partitions[i], i);
-    // }
+    cout << "root size" << root.size() << endl ;
+    
+    pointsToFile();
     return 0;
 }
