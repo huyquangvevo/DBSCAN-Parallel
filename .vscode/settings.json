@@ -8,6 +8,8 @@
         "xstring": "cpp",
         "xutility": "cpp",
         "ostream": "cpp",
-        "iostream": "cpp"
+        "iostream": "cpp",
+        "xtree": "cpp",
+        "set": "cpp"
     }
 }
