@@ -69,9 +69,6 @@ int main(int argc, char **argv) {
      * Now we have the receive buffer, counts, and displacements, and 
      * can gather the strings 
      */
-    for(int i=0;i<size;i++){
-        printf("displ %d: %d\n",i,displs[i]);
-    }
 
     MPI_Gatherv(mystring, mylen, MPI_CHAR,
                 totalstring, recvcounts, displs, MPI_CHAR,

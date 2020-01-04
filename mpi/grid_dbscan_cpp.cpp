@@ -29,6 +29,7 @@ int minPts = 5;
 // Point points[150000];
 vector<Point> points;
 const int UNDEFINED = 0;
+const int MAX_PARTITION_CLUSTER = 1000;
 float max_Ox = -10000;
 float min_Ox = 10000;
 float max_Oy = -10000;
@@ -181,8 +182,7 @@ int dbscan(int idP)
             continue;
         };
         c = c + 1;
-        // cout << "c : " << c << endl;
-        root.push_back(c);
+        // root.push_back(c);
         partitions[idP][p].clusterId = c;
         set<int> S = neighbors;
         while (S.size() > 0)
@@ -324,13 +324,10 @@ int main()
     for (int i = 0; i < partitionPerProcessor; i++)
     {
         int index = world_rank*partitionPerProcessor + i;
-        // cout << "index partition: " << index << endl;
         if(index >= n_slices)
             break;
         dbscan(index);
-        // totalSize += partitions[index].size();
     };
-    
 
     int *recvCounts = NULL;
     int *partitionLabels = NULL;
@@ -357,9 +354,6 @@ int main()
         for(i=1;i<world_size;i++){
             totalLen += recvCounts[i];
             displs[i] = displs[i-1] + recvCounts[i-1];
-            // cout << "displs " << i - 1 << " : " << displs[i-1] << endl;
-            // cout << "recvCounts " << i - 1 << " : " << recvCounts[i-1] << endl;
-            // cout << "displs " << i << " : " << displs[i] << endl;
 
         }
         partitionLabels = (int *)malloc(totalLen*sizeof(int));
@@ -376,25 +370,33 @@ int main()
         MPI_COMM_WORLD
     );
 
+
     if(world_rank == ROOT_RANK){
-        // cout << "partition per processor: " << partitionLabels[5004] << endl;
         cout << "recv Counts: " << recvCounts[0] << endl;
         cout << "recv Counts: " << recvCounts[1] << endl;
-        
-        int i;
+        set<int> labels;
+        int maxLabel = 0;
+        int i,cluster,label_,labelBlock = 0;
+        bool isEndProcessor = true;
 
         for(int i=0;i<totalLen;i+=2){
-            if(i>500){
-                // cout << "i : " << i << endl;
-                // cout << world_rank << endl;
-                // cout << "id: " << partitionLabels[i] << endl;
-                // cout << "label: " << partitionLabels[i+1] << endl;
-            }
-            points[partitionLabels[i]].clusters.push_back(partitionLabels[i+1]);
+            label_ = partitionLabels[i+1];
+            labelBlock = ((label_ >= MAX_PARTITION_CLUSTER && partitionLabels[i-1] < MAX_PARTITION_CLUSTER)
+                          ||(label_ < MAX_PARTITION_CLUSTER && partitionLabels[i-1] >= MAX_PARTITION_CLUSTER)) ?
+                            maxLabel : labelBlock;
+            cluster = label_>=MAX_PARTITION_CLUSTER ? 
+                    labelBlock + label_ % MAX_PARTITION_CLUSTER : label_;
+            maxLabel = max(label_,cluster);
+            labels.insert(cluster);
+            points[partitionLabels[i]].clusters.push_back(cluster);
         }
 
-        // updateClusterIdPoints();
-        // cout << "bug" << endl;
+        set<int>::iterator it; 
+        for(it=labels.begin();it!=labels.end();++it){
+            root.push_back(*it);
+        }
+
+        updateClusterIdPoints();
         pointsToFile();
         
         free(partitionLabels);
@@ -402,7 +404,7 @@ int main()
         free(recvCounts);
     }
 
-    // MPI_Barrier(MPI_COMM_WORLD);
+    MPI_Barrier(MPI_COMM_WORLD);
     MPI_Finalize();
     return 0;
 }
