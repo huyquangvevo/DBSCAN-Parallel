@@ -26,7 +26,6 @@ int n_points = 0;
 float eps = 0.3;
 float epArea = 0.1;
 int minPts = 5;
-// Point points[150000];
 vector<Point> points;
 const int UNDEFINED = 0;
 const int MAX_PARTITION_CLUSTER = 1000;
@@ -142,7 +141,6 @@ set<int> findNeighbors(Point p, int idP)
 
 void updateClustersPoint(int idPartition){
     for(int i=0;i<partitions[idPartition].size();i++){
-        // points[partitions[idPartition][i].id].clusters.push_back(partitions[idPartition][i].clusterId);
         localLabels.push_back(partitions[idPartition][i].id);
         localLabels.push_back(partitions[idPartition][i].clusterId);
     }
@@ -158,7 +156,8 @@ void updateClusterIdPoints(){
             if(ru != rv){
                 root[rv] = ru;
             }
-        }
+        }        // points[partitions[idPartition][i].id].clusters.push_back(partitions[idPartition][i].clusterId);
+
     }
     for(int i=0;i<n_points;i++){
         points[i].clusterId = root[points[i].clusters[0]];
