@@ -23,28 +23,6 @@ int *create_rand_nums(int num_elements)
     return rand_nums;
 }
 
-int *merge(int *A, int *B, int n)
-{
-    int *C = (int *)malloc(sizeof(int) * 2 * n);
-    assert(C != NULL);
-    int i = 1, j = 1, k = 1;
-    while (k <= 2 * n)
-    {
-        if (A[i] < B[j])
-        {
-            C[k] = A[i];
-            i = i + 1;
-        }
-        else
-        {
-            C[k] = B[j];
-            j = j + 1;
-        };
-        k = k + 1;
-    }
-    return C;
-}
-
 void printArray(string s, int *arr, int size)
 {
     cout << s << " : ";
@@ -54,6 +32,35 @@ void printArray(string s, int *arr, int size)
         cout << arr[i] << " ";
     }
     cout << endl;
+}
+
+int *merge(int *A_, int *B_, int size_A, int size_B)
+{
+    int *C_ = (int *)malloc(sizeof(int) * (size_A + size_B));
+    assert(C_ != NULL);
+    int i = 0, j = 0, k = 0;
+    while (k < size_A + size_B)
+    {
+        if (i == size_A)
+        {
+            C_[k++] = B_[j++];
+            continue;
+        }
+        if (j == size_B)
+        {
+            C_[k++] = A_[i++];
+            continue;
+        };
+        if (A_[i] < B_[j])
+        {
+            C_[k++] = A_[i++];
+        }
+        else
+        {
+            C_[k++] = B_[j++];
+        };
+    }
+    return C_;
 }
 
 int binarySearch(int arr[], int l, int r, int x)
@@ -75,14 +82,15 @@ int main()
     int *A = NULL;
     int *B = NULL;
     srand(time(NULL));
-    int n = 10, i;
+    int n = 9, i;
     int *C = NULL;
-    // C = (int *)malloc(sizeof(int) * n * 2);
 
     int *B_indexs = NULL;
     int *local_data = NULL;
-    local_data = (int *)malloc(sizeof(int) * n);
     int *data = NULL;
+    int *send_info = NULL;
+    int *recv_info = (int *)malloc(sizeof(int) * 2);
+    ;
     int *send_counts = NULL;
     int *displs = NULL;
     int *group_size = NULL;
@@ -99,61 +107,116 @@ int main()
     {
         A = create_rand_nums(n);
         B = create_rand_nums(n);
+        A[n - 1] = B[n - 1] >= A[n - 1] ? B[n - 1] + rand() % 10 : A[n - 1];
         printArray("A", A, n);
         printArray("B", B, n);
         int size_block = n % world_size == 0 ? n / world_size : n / world_size + 1;
-        cout << "root size block: " << size_block << endl;
-        cout << "root world size: " << world_size << endl;
         data = (int *)malloc(sizeof(int) * 2 * n + world_size);
         send_counts = (int *)malloc(sizeof(int) * world_size);
         displs = (int *)malloc(sizeof(int) * world_size);
+        group_size = (int *)malloc(sizeof(int) * world_size);
+        send_info = (int *)malloc(sizeof(int) * world_size * 2);
+        int ids = 0;
 
         B_indexs = (int *)malloc(sizeof(int) * size_block);
 
-        int i_data = 0,offset = 0;
+        int i_data = 0, offset = 0;
         for (i = 0; i < world_size; i++)
         {
             send_counts[i] = offset;
             displs[i] = offset;
-            int end_block = (i + 1) * size_block - 1;
-            B_indexs[i] = binarySearch(B, 0, n - 1, A[end_block]);
-            for (int j = i * size_block; j < (i + 1) * size_block; j++)
+            int end_block = (i == world_size -1) ? n - 1 : (i + 1) * size_block - 1; 
+            B_indexs[i] = (i==world_size-1) ? n-1 :  binarySearch(B, 0, n - 1, A[end_block]);
+            for (int j = i * size_block; j <= end_block; j++)
             {
                 data[i_data++] = A[j];
                 offset++;
             }
             data[i_data++] = SEPERATE;
-            offset ++;
+            send_info[ids++] = (i == 0) ? offset : offset - group_size[i - 1];
+            offset++;
             int i_prev = (i == 0) ? 0 : B_indexs[i - 1] + 1;
             for (int j = i_prev; j <= B_indexs[i]; j++)
             {
                 data[i_data++] = B[j];
-                offset ++;
+                offset++;
             }
-            group_size[i] = (i==0) ? offset : offset - group_size[i-1];
-            cout << "offset : " << offset << endl;
-            // send_counts[i] = (i==0) ? offset : send_counts[i-1] + offset;
-            // displs[i] = send_counts[i]; //(i==0) ? offset : displs[i-1] + offset;
-            // data[i_data++] = 12345678;
+            group_size[i] = (i == 0) ? offset : offset - group_size[i - 1];
+
+            send_info[ids++] = group_size[i];
         }
-        cout << "data: " << endl;
-        for (int i = 0; i < i_data; i++)
+    }
+
+
+
+    local_data = (int *)malloc(sizeof(int) * 2 * n);
+
+
+    MPI_Scatter(send_info, 2, MPI_FLOAT, recv_info,
+                2, MPI_FLOAT, 0, MPI_COMM_WORLD);
+
+    MPI_Scatterv(data, group_size, displs, MPI_INT,
+                 local_data, 2 * n, MPI_INT, ROOT_RANK, MPI_COMM_WORLD);
+
+    int *A_local = (int *)malloc(sizeof(int) * recv_info[0]);
+    int *B_local = (int *)malloc(sizeof(int) * (recv_info[1] - recv_info[0] - 1));
+    
+    for (i = 0; i < recv_info[1]; i++)
+    {
+        if (i == recv_info[0])
+            continue;
+        if (i < recv_info[0])
         {
-            cout << data[i] << endl;
+            A_local[i] = local_data[i];
         }
-        cout << "end data!" << endl;
+        else
+        {
+            B_local[i - recv_info[0] - 1] = local_data[i];
+        }
+    }
+    int *C_local = NULL;
+    C_local = merge(A_local, B_local, recv_info[0], recv_info[1] - recv_info[0] - 1);
+    
+    if(world_rank == ROOT_RANK){
+        C = (int *)malloc(sizeof(int) * n * 2);
+        for(i=0;i<world_size;i++){
+            displs[i] = (i==0) ? displs[i] : displs[i] - 1;
+            group_size[i] -= 1;
+        }
     }
 
-    MPI_Scatterv(data, send_counts, displs, MPI_INT,
-            local_data, n, MPI_INT, ROOT_RANK, MPI_COMM_WORLD);
     
-    if(world_rank != ROOT_RANK){
-        cout << "local data 0: " << local_data[0] << endl;
-        cout << "local data 1: " << local_data[1] << endl;
-        cout << "local data 2: " << local_data[2] << endl;
 
+    MPI_Gatherv(
+        C_local,
+        recv_info[1]-1,
+        MPI_INT,
+        C,
+        group_size,
+        displs,MPI_INT,ROOT_RANK,
+        MPI_COMM_WORLD
+    );
+
+    if (world_rank == ROOT_RANK)
+    {
+        printArray("C",C,2*n);
+        free(A);
+        free(B);
+        free(B_indexs);
+        free(data);
+        free(send_info);
+        free(send_counts);
+        free(displs);
+        free(group_size);
+        free(C);
     }
-    
+
+    free(recv_info);
+    free(local_data);
+    free(A_local);
+    free(B_local);
+    free(C_local);
+
     MPI_Barrier(MPI_COMM_WORLD);
     MPI_Finalize();
     return 0;
