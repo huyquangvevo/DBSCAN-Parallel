@@ -412,7 +412,7 @@ int main()
     if (world_rank == ROOT_RANK)
     {
         auto duration = duration_cast<microseconds>(stop - start);
-        cout << "Runtime: " << duration.count() << endl;
+        cout << "Execution time: " << duration.count() << endl;
     }
 
     MPI_Barrier(MPI_COMM_WORLD);

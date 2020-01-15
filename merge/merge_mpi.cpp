@@ -4,8 +4,10 @@
 #include <time.h>
 #include "mpi.h"
 #include <assert.h>
+#include <chrono>
 
 using namespace std;
+using namespace std::chrono;
 
 const int SEPERATE = -1000;
 
@@ -79,10 +81,12 @@ int binarySearch(int arr[], int l, int r, int x)
 
 int main()
 {
+    auto start = high_resolution_clock::now();
+
     int *A = NULL;
     int *B = NULL;
     srand(time(NULL));
-    int n = 9, i;
+    int n = 20000, i;
     int *C = NULL;
 
     int *B_indexs = NULL;
@@ -125,8 +129,8 @@ int main()
         {
             send_counts[i] = offset;
             displs[i] = offset;
-            int end_block = (i == world_size -1) ? n - 1 : (i + 1) * size_block - 1; 
-            B_indexs[i] = (i==world_size-1) ? n-1 :  binarySearch(B, 0, n - 1, A[end_block]);
+            int end_block = (i == world_size - 1) ? n - 1 : (i + 1) * size_block - 1;
+            B_indexs[i] = (i == world_size - 1) ? n - 1 : binarySearch(B, 0, n - 1, A[end_block]);
             for (int j = i * size_block; j <= end_block; j++)
             {
                 data[i_data++] = A[j];
@@ -147,10 +151,7 @@ int main()
         }
     }
 
-
-
     local_data = (int *)malloc(sizeof(int) * 2 * n);
-
 
     MPI_Scatter(send_info, 2, MPI_FLOAT, recv_info,
                 2, MPI_FLOAT, 0, MPI_COMM_WORLD);
@@ -160,7 +161,7 @@ int main()
 
     int *A_local = (int *)malloc(sizeof(int) * recv_info[0]);
     int *B_local = (int *)malloc(sizeof(int) * (recv_info[1] - recv_info[0] - 1));
-    
+
     for (i = 0; i < recv_info[1]; i++)
     {
         if (i == recv_info[0])
@@ -176,30 +177,29 @@ int main()
     }
     int *C_local = NULL;
     C_local = merge(A_local, B_local, recv_info[0], recv_info[1] - recv_info[0] - 1);
-    
-    if(world_rank == ROOT_RANK){
+
+    if (world_rank == ROOT_RANK)
+    {
         C = (int *)malloc(sizeof(int) * n * 2);
-        for(i=0;i<world_size;i++){
-            displs[i] = (i==0) ? displs[i] : displs[i] - 1;
+        for (i = 0; i < world_size; i++)
+        {
+            displs[i] = (i == 0) ? displs[i] : displs[i] - 1;
             group_size[i] -= 1;
         }
     }
 
-    
-
     MPI_Gatherv(
         C_local,
-        recv_info[1]-1,
+        recv_info[1] - 1,
         MPI_INT,
         C,
         group_size,
-        displs,MPI_INT,ROOT_RANK,
-        MPI_COMM_WORLD
-    );
+        displs, MPI_INT, ROOT_RANK,
+        MPI_COMM_WORLD);
 
     if (world_rank == ROOT_RANK)
     {
-        printArray("C",C,2*n);
+        printArray("C", C, 2 * n);
         free(A);
         free(B);
         free(B_indexs);
@@ -216,6 +216,13 @@ int main()
     free(A_local);
     free(B_local);
     free(C_local);
+
+    auto stop = high_resolution_clock::now();
+    if (world_rank == ROOT_RANK)
+    {
+        auto duration = duration_cast<microseconds>(stop - start);
+        cout << "Execution time: " << duration.count() << endl;
+    }
 
     MPI_Barrier(MPI_COMM_WORLD);
     MPI_Finalize();

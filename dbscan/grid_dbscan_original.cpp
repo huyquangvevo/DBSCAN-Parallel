@@ -9,7 +9,6 @@
 #include <string>
 #include <set>
 #include <algorithm>
-#include <mpi.h>
 #include <chrono>
 
 
@@ -30,9 +29,9 @@ int n_points = 0;
 float eps = 0.3;
 float epArea = 0.1;
 int minPts = 5;
+// Point points[150000];
 vector<Point> points;
 const int UNDEFINED = 0;
-const int MAX_PARTITION_CLUSTER = 1000;
 float max_Ox = -10000;
 float min_Ox = 10000;
 float max_Oy = -10000;
@@ -43,8 +42,6 @@ int n_slices = 0;
 const int MAX_SLICE = 1000;
 vector<Point> partitions[MAX_SLICE];
 vector<int> root;
-
-vector<int> localLabels;
 
 // Disjoint set
 // find root of node and update
@@ -145,8 +142,7 @@ set<int> findNeighbors(Point p, int idP)
 
 void updateClustersPoint(int idPartition){
     for(int i=0;i<partitions[idPartition].size();i++){
-        localLabels.push_back(partitions[idPartition][i].id);
-        localLabels.push_back(partitions[idPartition][i].clusterId);
+        points[partitions[idPartition][i].id].clusters.push_back(partitions[idPartition][i].clusterId);
     }
 }
 
@@ -160,15 +156,14 @@ void updateClusterIdPoints(){
             if(ru != rv){
                 root[rv] = ru;
             }
-        }        // points[partitions[idPartition][i].id].clusters.push_back(partitions[idPartition][i].clusterId);
-
+        }
     }
     for(int i=0;i<n_points;i++){
         points[i].clusterId = root[points[i].clusters[0]];
     }
 }
 
-int c; //= 0;
+int c = 0;
 
 int dbscan(int idP)
 {
@@ -185,7 +180,7 @@ int dbscan(int idP)
             continue;
         };
         c = c + 1;
-        // root.push_back(c);
+        root.push_back(c);
         partitions[idP][p].clusterId = c;
         set<int> S = neighbors;
         while (S.size() > 0)
@@ -288,6 +283,7 @@ void partitionPoints()
 int main()
 {
     auto start = high_resolution_clock::now();
+    
     readPoints();
     n_slices = calSlice();
     cout << "max ox " << max_Ox << endl;
@@ -300,122 +296,23 @@ int main()
 
     root.push_back(0);
     partitionPoints();
-    // int totalSize = 0;
-    // for (int i = 0; i <= n_slices; i++)
-    // {
-    //     dbscan(i);
-    //     totalSize += partitions[i].size();
-    // }
-    // updateClusterIdPoints();
-
-    // cout << "total size: " << totalSize << endl;
-    // cout << " n points: " << n_points << endl;
-    // cout << "partition 0 : " << partitions[0].size() << endl;
-    
-    // pointsToFile();
-    // return 0;
-
-
-    // mpi 
-    const int ROOT_RANK = 0;
-    MPI_Init(NULL,NULL);
-    int world_rank;
-    MPI_Comm_rank(MPI_COMM_WORLD,&world_rank);
-    int world_size;
-    MPI_Comm_size(MPI_COMM_WORLD,&world_size);
-    int partitionPerProcessor = (n_slices%world_size == 0)?(n_slices/world_size):(n_slices/world_size + 1);
-    c = world_rank * 1000;
-    for (int i = 0; i < partitionPerProcessor; i++)
+    int totalSize = 0;
+    for (int i = 0; i <= n_slices; i++)
     {
-        int index = world_rank*partitionPerProcessor + i;
-        if(index >= n_slices)
-            break;
-        dbscan(index);
-    };
+        dbscan(i);
+        totalSize += partitions[i].size();
+    }
+    updateClusterIdPoints();
 
-    int *recvCounts = NULL;
-    int *partitionLabels = NULL;
-
-    if(world_rank == ROOT_RANK)
-        recvCounts = (int *)malloc( world_size * sizeof(int));
+    cout << "total size: " << totalSize << endl;
+    cout << " n points: " << n_points << endl;
+    cout << "partition 0 : " << partitions[0].size() << endl;
     
-    int localSize = localLabels.size();
-
-    MPI_Gather(&localSize,1,MPI_INT,
-        recvCounts,1,MPI_INT,
-        0,MPI_COMM_WORLD
-    );
-
-    int *displs = NULL;
-    int totalLen = 0;
-
-    if(world_rank == ROOT_RANK){
-        displs = (int *)malloc(world_size * sizeof(int));
-
-        displs[0] = 0;
-        totalLen = recvCounts[0];
-        int i;
-        for(i=1;i<world_size;i++){
-            totalLen += recvCounts[i];
-            displs[i] = displs[i-1] + recvCounts[i-1];
-
-        }
-        partitionLabels = (int *)malloc(totalLen*sizeof(int));
-        cout << "total len: " << totalLen << endl;
-    }
-
-    MPI_Gatherv(
-        localLabels.data(),
-        localSize,
-        MPI_INT,
-        partitionLabels,
-        recvCounts,
-        displs,MPI_INT,ROOT_RANK,
-        MPI_COMM_WORLD
-    );
-
-
-    if(world_rank == ROOT_RANK){
-        cout << "recv Counts: " << recvCounts[0] << endl;
-        cout << "recv Counts: " << recvCounts[1] << endl;
-        set<int> labels;
-        int maxLabel = 0;
-        int i,cluster,label_,labelBlock = 0;
-        bool isEndProcessor = true;
-
-        for(int i=0;i<totalLen;i+=2){
-            label_ = partitionLabels[i+1];
-            labelBlock = ((label_ >= MAX_PARTITION_CLUSTER && partitionLabels[i-1] < MAX_PARTITION_CLUSTER)
-                          ||(label_ < MAX_PARTITION_CLUSTER && partitionLabels[i-1] >= MAX_PARTITION_CLUSTER)) ?
-                            maxLabel : labelBlock;
-            cluster = label_>=MAX_PARTITION_CLUSTER ? 
-                    labelBlock + label_ % MAX_PARTITION_CLUSTER : label_;
-            maxLabel = max(label_,cluster);
-            labels.insert(cluster);
-            points[partitionLabels[i]].clusters.push_back(cluster);
-        }
-
-        set<int>::iterator it; 
-        for(it=labels.begin();it!=labels.end();++it){
-            root.push_back(*it);
-        }
-
-        updateClusterIdPoints();
-        pointsToFile();
-        
-        free(partitionLabels);
-        free(displs);
-        free(recvCounts);
-    }
+    pointsToFile();
 
     auto stop = high_resolution_clock::now();
-    if (world_rank == ROOT_RANK)
-    {
-        auto duration = duration_cast<microseconds>(stop - start);
-        cout << "Runtime: " << duration.count() << endl;
-    }
+    auto duration = duration_cast<microseconds>(stop - start);
+    cout << "Execution time: " << duration.count() << endl;
 
-    MPI_Barrier(MPI_COMM_WORLD);
-    MPI_Finalize();
     return 0;
 }
