@@ -1,0 +1,15 @@
+max ox 1.92576
+min ox -1.95214
+max oy 1.95151
+min oy -1.95214
+slice ox: 5
+slice oy: 5
+num slices: 25
+max ox 1.92576
+min ox -1.95214
+max oy 1.95151
+min oy -1.95214
+slice ox: 5
+slice oy: 5
+num slices: 25
+Execution time: 119265804

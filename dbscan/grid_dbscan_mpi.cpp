@@ -60,10 +60,15 @@ int bruteFind(int node){
 }
 
 
-void readPoints()
+void readPoints(char* name)
 {
     FILE *f;
-    f = fopen("../data/Circle.txt", "r");
+    string filename(name);
+    string path("../data/");
+    string extend(".txt");
+    path.append(name);
+    path.append(extend);
+    f = fopen(path.c_str(), "r");
     char point[255];
     while (fgets(point, 255, f))
     {
@@ -95,7 +100,7 @@ int calSlice()
 void pointsToFile()
 {
     ofstream f;
-    f.open("../data/merged.txt");
+    f.open("../data/merged.txt",ios::trunc);
     for (int p = 0; p < n_points; p++)
     {
         string px(to_string(points[p].x));
@@ -107,16 +112,16 @@ void pointsToFile()
     f.close();
 }
 
-void partitionToFile(vector<Point> p, int idPartittion)
+void partitionToFile(int idPartittion)
 {
     ofstream f;
     string filename = "../data/partitions/" + to_string(idPartittion) + ".txt";
-    f.open(filename);
-    for (int i = 0; i < p.size(); i++)
+    f.open(filename,ios::trunc);
+    for (int i = 0; i < partitions[idPartittion].size(); i++)
     {
-        string px(to_string(points[p[i].id].x));
-        string py(to_string(points[p[i].id].y));
-        string pl(to_string(points[p[i].id].clusterId));
+        string px(to_string(partitions[idPartittion][i].x));
+        string py(to_string(partitions[idPartittion][i].y));
+        string pl(to_string(partitions[idPartittion][i].clusterId));
         string pstr = px + " " + py + " " + pl + " " + "\n";
 
         f << pstr;
@@ -207,6 +212,7 @@ int dbscan(int idP)
             }
         }
     }
+    // partitionToFile(idP);
     updateClustersPoint(idP);
     return c;
 };
@@ -285,10 +291,10 @@ void partitionPoints()
     }
 }
 
-int main()
+int main(int argc,char** argv)
 {
     auto start = high_resolution_clock::now();
-    readPoints();
+    readPoints(argv[1]);
     n_slices = calSlice();
     cout << "max ox " << max_Ox << endl;
     cout << "min ox " << min_Oy << endl;
@@ -300,22 +306,6 @@ int main()
 
     root.push_back(0);
     partitionPoints();
-    // int totalSize = 0;
-    // for (int i = 0; i <= n_slices; i++)
-    // {
-    //     dbscan(i);
-    //     totalSize += partitions[i].size();
-    // }
-    // updateClusterIdPoints();
-
-    // cout << "total size: " << totalSize << endl;
-    // cout << " n points: " << n_points << endl;
-    // cout << "partition 0 : " << partitions[0].size() << endl;
-    
-    // pointsToFile();
-    // return 0;
-
-
     // mpi 
     const int ROOT_RANK = 0;
     MPI_Init(NULL,NULL);
@@ -358,10 +348,8 @@ int main()
         for(i=1;i<world_size;i++){
             totalLen += recvCounts[i];
             displs[i] = displs[i-1] + recvCounts[i-1];
-
         }
         partitionLabels = (int *)malloc(totalLen*sizeof(int));
-        cout << "total len: " << totalLen << endl;
     }
 
     MPI_Gatherv(
@@ -376,21 +364,23 @@ int main()
 
 
     if(world_rank == ROOT_RANK){
-        cout << "recv Counts: " << recvCounts[0] << endl;
-        cout << "recv Counts: " << recvCounts[1] << endl;
+
+
         set<int> labels;
         int maxLabel = 0;
         int i,cluster,label_,labelBlock = 0;
-        bool isEndProcessor = true;
-
+        int maxPrevBlock = 0;
+        int k = 0;
         for(int i=0;i<totalLen;i+=2){
             label_ = partitionLabels[i+1];
-            labelBlock = ((label_ >= MAX_PARTITION_CLUSTER && partitionLabels[i-1] < MAX_PARTITION_CLUSTER)
-                          ||(label_ < MAX_PARTITION_CLUSTER && partitionLabels[i-1] >= MAX_PARTITION_CLUSTER)) ?
-                            maxLabel : labelBlock;
-            cluster = label_>=MAX_PARTITION_CLUSTER ? 
-                    labelBlock + label_ % MAX_PARTITION_CLUSTER : label_;
-            maxLabel = max(label_,cluster);
+
+            if(i == displs[k]){
+                maxPrevBlock = maxLabel;
+                k++;
+            }
+            cluster = label_ % MAX_PARTITION_CLUSTER + maxPrevBlock;
+            maxLabel = max(maxLabel,cluster);
+
             labels.insert(cluster);
             points[partitionLabels[i]].clusters.push_back(cluster);
         }

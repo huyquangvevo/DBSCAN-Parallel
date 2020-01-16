@@ -8,7 +8,8 @@ const char *const strings[nstrings] = {"Hello","world!","Bonjour","le","monde!"}
 
 int main(int argc, char **argv) {
 
-    MPI_Init(&argc, &argv); 
+    MPI_Init(&argc, &argv);
+    printf("%d",argv[0]);
 
     int rank, size;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
@@ -34,6 +35,7 @@ int main(int argc, char **argv) {
     if (rank == root)
         recvcounts = malloc( size * sizeof(int)) ;
 
+    // gop thong tin tu con ve, Gatherv khackich 
     MPI_Gather(&mylen, 1, MPI_INT,
                recvcounts, 1, MPI_INT,
                root, MPI_COMM_WORLD);
@@ -43,9 +45,9 @@ int main(int argc, char **argv) {
      * and displacements for each rank 
      */
 
-    int totlen = 0;
-    int *displs = NULL;
-    char *totalstring = NULL;
+    int totlen = 0; // free
+    int *displs = NULL; // free
+    char *totalstring = NULL; // free
 
     if (rank == root) {
         displs = malloc( size * sizeof(int) );

@@ -71,21 +71,20 @@ int binarySearch(int arr[], int l, int r, int x)
     return -1;
 }
 
-int main()
+int main(int argc,char** argv)
 {
     auto start = high_resolution_clock::now();
     int *A = NULL;
     int *B = NULL;
     srand(time(NULL));
-    int n = 20000;
+    int n = atoi(argv[1]);
     int *C = NULL;
-    // C = (int *)malloc(sizeof(int) * n * 2);
     A = create_rand_nums(n);
     B = create_rand_nums(n);
     C = merge(A, B, n);
-    printArray("A",A,n);
-    printArray("B",B,n);
-    printArray("C",C,n);
+    // printArray("A",A,n);
+    // printArray("B",B,n);
+    // printArray("C",C,n);
 
     // int i;
     // printArray("A", A, n);

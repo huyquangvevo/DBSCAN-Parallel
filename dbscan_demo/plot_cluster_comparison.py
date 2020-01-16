@@ -41,7 +41,8 @@ np.random.seed(0)
 # Generate datasets. We choose the size big enough to see the scalability
 # of the algorithms, but not too big to avoid too long running times
 # ============
-n_samples = 1500
+NUM = 20
+n_samples = NUM * 1000 
 noisy_circles = datasets.make_circles(n_samples=n_samples, factor=.5,
                                       noise=.03)
 noisy_moons = datasets.make_moons(n_samples=n_samples, noise=.05)
@@ -63,9 +64,9 @@ varied = datasets.make_blobs(n_samples=n_samples,
 # ============
 # Set up cluster parameters
 # ============
-plt.figure(figsize=(9 * 2 + 3, 12.5))
-plt.subplots_adjust(left=.02, right=.98, bottom=.001, top=.96, wspace=.05,
-                    hspace=.01)
+# plt.figure(figsize=(9 * 2 + 3, 12.5))
+# plt.subplots_adjust(left=.02, right=.98, bottom=.001, top=.96, wspace=.05,
+#                     hspace=.01)
 
 plot_num = 1
 
@@ -94,7 +95,7 @@ noisy_circles = list(noisy_circles)
 noisy_circles[0] = StandardScaler().fit_transform(noisy_circles[0])
 
 def writeData(name,data):
-    fileName = './data/' + name + '.txt'
+    fileName = '../data/' + name + '.txt'
     points = data[0]
     labels = data[1]
     with open(fileName,'w') as f:
@@ -112,5 +113,5 @@ circles = noisy_circles[0].T
 # circles = noisy_circles
 # print(circles)
 # exit()
-writeData('Circle',noisy_circles)
+writeData('Circle_{}'.format(NUM),noisy_circles)
 # print(noisy_circles)

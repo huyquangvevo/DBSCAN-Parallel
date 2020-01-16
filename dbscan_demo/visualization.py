@@ -4,7 +4,7 @@ import numpy as np
 X = []
 Y = []
 labels = []
-with open("./data/merged.txt","r") as f:
+with open("../data/partitions/24.txt","r") as f:
     points = f.readlines()
     for point in points:
         p = point.split(" ")

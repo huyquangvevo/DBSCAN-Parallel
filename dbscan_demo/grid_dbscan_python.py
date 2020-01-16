@@ -142,7 +142,7 @@ def check_disjoin(cor_lists):
 
 
 if __name__ == "__main__":
-    n_samples = 1500
+    n_samples = 150000
     eps=.3
     cell_width = 3 * eps
     minPts = 2

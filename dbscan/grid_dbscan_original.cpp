@@ -57,10 +57,15 @@ int bruteFind(int node){
 }
 
 
-void readPoints()
+void readPoints(char* name)
 {
     FILE *f;
-    f = fopen("../data/Circle.txt", "r");
+    string filename(name);
+    string path("../data/");
+    string extend(".txt");
+    path.append(name);
+    path.append(extend);
+    f = fopen(path.c_str(), "r");
     char point[255];
     while (fgets(point, 255, f))
     {
@@ -280,11 +285,11 @@ void partitionPoints()
     }
 }
 
-int main()
+int main(int argc,char** argv)
 {
     auto start = high_resolution_clock::now();
     
-    readPoints();
+    readPoints(argv[1]);
     n_slices = calSlice();
     cout << "max ox " << max_Ox << endl;
     cout << "min ox " << min_Oy << endl;
