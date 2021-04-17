@@ -1,10 +1,16 @@
 #include <iostream>
+#include <stdio.h>
+
 #include <vector>
 #include <stdlib.h>
 #include <time.h>
-#include "mpi.h"
-#include <assert.h>
+#include <mpi.h>
+#include <bits/stdc++.h>
+// #include <assert.h>
 #include <chrono>
+
+double t_comunication = 0;
+
 
 using namespace std;
 using namespace std::chrono;
@@ -14,7 +20,7 @@ const int SEPERATE = -1000;
 int *create_rand_nums(int num_elements)
 {
     int *rand_nums = (int *)malloc(sizeof(int) * num_elements);
-    assert(rand_nums != NULL);
+    // assert(rand_nums != NULL);
     int i, prev_num = 0;
     for (i = 0; i < num_elements; i++)
     {
@@ -39,7 +45,7 @@ void printArray(string s, int *arr, int size)
 int *merge(int *A_, int *B_, int size_A, int size_B)
 {
     int *C_ = (int *)malloc(sizeof(int) * (size_A + size_B));
-    assert(C_ != NULL);
+    // assert(C_ != NULL);
     int i = 0, j = 0, k = 0;
     while (k < size_A + size_B)
     {
@@ -86,11 +92,23 @@ int binarySearch(int arr[], int l, int r, int x)
 int main(int argc,char** argv)
 {
     auto start = high_resolution_clock::now();
+    
+    const int ROOT_RANK = 0;
+    int n = atoi(argv[1]);
+    int isShow = atoi(argv[2]);
+
+    double start_com,end;
+
+
+    MPI_Init(NULL, NULL);
+    int world_rank, world_size;
+    MPI_Comm_rank(MPI_COMM_WORLD, &world_rank);
+    MPI_Comm_size(MPI_COMM_WORLD, &world_size);
+
 
     int *A = NULL;
     int *B = NULL;
     srand(time(NULL));
-    int n = atoi(argv[1]);
     int i;
     
     int *C = NULL;
@@ -99,26 +117,29 @@ int main(int argc,char** argv)
     int *local_data = NULL;
     int *data = NULL;
     int *send_info = NULL;
-    int *recv_info = (int *)malloc(sizeof(int) * 2);
+    int *recv_info = NULL;
+    recv_info = (int *)malloc(sizeof(int) * 2);
     int *displs = NULL;
     int *group_size = NULL;
 
+    int *A_local = NULL;
+    int *B_local = NULL;
+    int *C_local = NULL;
+
+
     // MPI
 
-    MPI_Init(NULL, NULL);
-    const int ROOT_RANK = 0;
-    int world_rank, world_size;
-    MPI_Comm_rank(MPI_COMM_WORLD, &world_rank);
-    MPI_Comm_size(MPI_COMM_WORLD, &world_size);
-
+   
     if (world_rank == ROOT_RANK)
     {
         A = create_rand_nums(n);
         B = create_rand_nums(n);
         A[n - 1] = B[n - 1] >= A[n - 1] ? B[n - 1] + rand() % 10 : A[n - 1];
-        // printArray("A", A, n);
-        // printArray("B", B, n);
-        int size_block = n % world_size == 0 ? n / world_size : n / world_size + 1;
+        if(isShow == 1){
+            printArray("A", A, n);
+            printArray("B", B, n);
+        }
+        int size_block = (n % world_size == 0 ) ? n / world_size : n / world_size + 1;
         // data chua cai gi? : 2 mang, them cac phan tu ngan cach
         data = (int *)malloc(sizeof(int) * 2 * n + world_size);
         // khong dung
@@ -161,17 +182,26 @@ int main(int argc,char** argv)
     }
 
 
-    local_data = (int *)malloc(sizeof(int) * 2 * n);
 
-
+    start_com = MPI_Wtime();
     MPI_Scatter(send_info, 2, MPI_INT, recv_info,
-                2, MPI_INT, 0, MPI_COMM_WORLD);
+                2, MPI_INT, ROOT_RANK, MPI_COMM_WORLD);
+    end = MPI_Wtime();
+    t_comunication += end - start_com;
 
+
+    local_data = (int *)malloc(sizeof(int) * recv_info[1]);
+
+    start_com = MPI_Wtime();
     MPI_Scatterv(data, group_size, displs, MPI_INT,
-                 local_data, 2 * n, MPI_INT, ROOT_RANK, MPI_COMM_WORLD);
+                 local_data, recv_info[1], MPI_INT, ROOT_RANK, MPI_COMM_WORLD);
+    end = MPI_Wtime();
+    t_comunication += end - start_com;
 
-    int *A_local = (int *)malloc(sizeof(int) * recv_info[0]);
-    int *B_local = (int *)malloc(sizeof(int) * (recv_info[1] - recv_info[0] - 1));
+
+    A_local = (int *)malloc(sizeof(int) * recv_info[0]);
+    if((recv_info[1] - recv_info[0] - 1)!=0)
+    B_local = (int *)malloc(sizeof(int) * (recv_info[1] - recv_info[0] - 1));
 
     
     for (i = 0; i < recv_info[1]; i++)
@@ -187,7 +217,7 @@ int main(int argc,char** argv)
             B_local[i - recv_info[0] - 1] = local_data[i];
         }
     }
-    int *C_local = NULL;
+    
     C_local = merge(A_local, B_local, recv_info[0], recv_info[1] - recv_info[0] - 1);
 
 
@@ -199,9 +229,7 @@ int main(int argc,char** argv)
         }
     }
 
-
-    
-
+    start_com = MPI_Wtime();
     MPI_Gatherv(
         C_local,
         recv_info[1] - 1,
@@ -211,9 +239,13 @@ int main(int argc,char** argv)
         displs, MPI_INT, ROOT_RANK,
         MPI_COMM_WORLD);
 
+    end = MPI_Wtime();
+    t_comunication += end - start_com;
+
     if (world_rank == ROOT_RANK)
     {
-        // printArray("C", C, 2 * n);
+        if(isShow == 1)
+            printArray("C", C, 2 * n);
         free(A);
         free(B);
         free(B_indexs);
@@ -221,25 +253,25 @@ int main(int argc,char** argv)
         free(send_info);
         free(displs);
         free(group_size);
-        // free(C);
-        // free(recv_info);
-        // free(local_data);
-        // free(A_local);
-        // free(B_local);
-        // free(C_local);
+        free(C);
+
     }
 
-    // free(recv_info);
-    // free(local_data);
-    // free(A_local);
-    // free(B_local);
-    // free(C_local);
+    free(recv_info);
+    free(local_data);
+    free(A_local);
+    if(B_local != NULL)
+        free(B_local);
+    free(C_local);
+
 
     auto stop = high_resolution_clock::now();
     if (world_rank == ROOT_RANK)
     {
         auto duration = duration_cast<microseconds>(stop - start);
-        cout << "Execution time: " << duration.count() << endl;
+        cout << "Total time: " << duration.count() << endl;
+        cout << "Comunication time: " << t_comunication * 1000000 << endl;
+        cout << "Execution time: " << duration.count() - t_comunication * 1000000 << endl;
     }
 
     MPI_Barrier(MPI_COMM_WORLD);

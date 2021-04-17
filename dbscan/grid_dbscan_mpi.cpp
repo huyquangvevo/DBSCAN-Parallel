@@ -44,6 +44,8 @@ const int MAX_SLICE = 1000;
 vector<Point> partitions[MAX_SLICE];
 vector<int> root;
 
+double t_comunication = 0;
+
 vector<int> localLabels;
 
 // Disjoint set
@@ -296,13 +298,16 @@ int main(int argc,char** argv)
     auto start = high_resolution_clock::now();
     readPoints(argv[1]);
     n_slices = calSlice();
-    cout << "max ox " << max_Ox << endl;
-    cout << "min ox " << min_Oy << endl;
-    cout << "max oy " << max_Oy << endl;
-    cout << "min oy " << min_Oy << endl;
-    cout << "slice ox: " << num_slice_0x << endl;
-    cout << "slice oy: " << num_slice_Oy << endl;
-    cout << "num slices: " << n_slices << endl;
+    // cout << "max ox " << max_Ox << endl;
+    // cout << "min ox " << min_Oy << endl;
+    // cout << "max oy " << max_Oy << endl;
+    // cout << "min oy " << min_Oy << endl;
+    // cout << "slice ox: " << num_slice_0x << endl;
+    // cout << "slice oy: " << num_slice_Oy << endl;
+    // cout << "num slices: " << n_slices << endl;
+
+    double start_com,end;
+
 
     root.push_back(0);
     partitionPoints();
@@ -331,10 +336,14 @@ int main(int argc,char** argv)
     
     int localSize = localLabels.size();
 
+    start_com = MPI_Wtime();
     MPI_Gather(&localSize,1,MPI_INT,
         recvCounts,1,MPI_INT,
         0,MPI_COMM_WORLD
     );
+    end = MPI_Wtime();
+    t_comunication += end - start_com;
+
 
     int *displs = NULL;
     int totalLen = 0;
@@ -352,6 +361,7 @@ int main(int argc,char** argv)
         partitionLabels = (int *)malloc(totalLen*sizeof(int));
     }
 
+    start_com = MPI_Wtime();
     MPI_Gatherv(
         localLabels.data(),
         localSize,
@@ -361,6 +371,8 @@ int main(int argc,char** argv)
         displs,MPI_INT,ROOT_RANK,
         MPI_COMM_WORLD
     );
+    end = MPI_Wtime();
+    t_comunication += end - start_com;
 
 
     if(world_rank == ROOT_RANK){
@@ -402,7 +414,10 @@ int main(int argc,char** argv)
     if (world_rank == ROOT_RANK)
     {
         auto duration = duration_cast<microseconds>(stop - start);
-        cout << "Execution time: " << duration.count() << endl;
+        cout << "Total time: " << duration.count() << endl;
+        cout << "Comunication time: " << t_comunication * 1000000 << endl;
+        cout << "Execution time: " << duration.count() - t_comunication * 1000000 << endl;
+
     }
 
     MPI_Barrier(MPI_COMM_WORLD);
